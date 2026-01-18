@@ -2,6 +2,8 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { Navbar } from "@/components/Navbar"
+import { Footer } from "@/components/Footer"
 
 const ApiDocsPage = () => {
   const router = useRouter()
@@ -101,23 +103,23 @@ const ApiDocsPage = () => {
   }, [specUrl])
 
   return (
-    <div className="w-full bg-background min-h-screen">
-      <header className="w-full border-b border-border bg-card">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-3 flex items-center gap-4">
-          <button
-            onClick={() => router.push('/')}
-            className="inline-flex items-center gap-3 text-sm font-medium"
-            aria-label="Go to Untainted home"
-          >
-            <img src="/images/full-20logo.png" alt="Untainted" className="h-8" />
-          </button>
+    <>
+      <Navbar />
+      <div className="min-h-screen bg-background pt-24 pb-12">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">API Documentation</h1>
+                <p className="text-muted-foreground mt-2">
+                    Complete reference for the Untainted API. For access keys, please <a href="/contact" className="text-primary hover:underline">contact sales</a>.
+                </p>
+            </div>
+            <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+                <div id="redoc-root" style={{ minHeight: 600 }} />
+            </div>
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
-        <div id="redoc-root" style={{ minHeight: 400 }} />
-      </main>
-    </div>
+      </div>
+      <Footer />
+    </>
   )
 }
 

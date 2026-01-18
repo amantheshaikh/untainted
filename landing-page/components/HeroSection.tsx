@@ -22,12 +22,11 @@ export const HeroSection = () => {
             </div>
 
             <h1 className="text-4xl lg:text-5xl xl:text-6xl font-medium leading-tight tracking-tight text-foreground mb-6 text-balance">
-              Know What's In Your Food. <span className="text-primary">Every Time You Shop.</span>
+              Smarter Food Decisions. <span className="text-primary">Built Into Your Platform.</span>
             </h1>
 
             <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed mb-8 max-w-xl">
-              The food intelligence layer for India's leading platforms. We help quick-commerce apps, grocery platforms,
-              and health apps deliver personalized, safer food decisions to millions of users.
+              The food intelligence layer for India's leading platforms. We help quick-commerce, grocery, food delivery and health apps deliver personalized, safer food decisions to millions of users.
             </p>
 
             <div className="flex flex-wrap gap-4">

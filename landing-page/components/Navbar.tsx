@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
+import { supabase } from "../lib/supabaseClient"
+import { LogOut } from "lucide-react"
 
 const navigationLinks = [
   { name: "For Business", href: "#for-business" },
@@ -55,6 +57,31 @@ export const Navbar = () => {
   }
 
   const router = useRouter()
+  const pathname = usePathname()
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  useEffect(() => {
+    // Check auth state
+    const checkAuth = async () => {
+      if (!supabase || !supabase.auth || !supabase.auth.getUser) return setIsAuthenticated(false)
+      const { data: { user } } = await supabase.auth.getUser()
+      setIsAuthenticated(!!user)
+    }
+    checkAuth()
+
+    // Listen for auth changes
+    let subscription: any
+    if (supabase && supabase.auth && supabase.auth.onAuthStateChange) {
+      const { data } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+        setIsAuthenticated(!!session?.user)
+      })
+      subscription = data?.subscription || data
+    }
+
+    return () => {
+      if (subscription && subscription.unsubscribe) subscription.unsubscribe()
+    }
+  }, [])
 
   return (
     <nav
@@ -67,7 +94,7 @@ export const Navbar = () => {
           {/* Logo */}
           <div className="flex-shrink-0">
             <button
-              onClick={() => handleLinkClick("#home")}
+              onClick={() => router.push("/")}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-200"
             >
               <img src="/images/full-20logo.png" alt="Untainted" className="h-8" />
@@ -91,19 +118,36 @@ export const Navbar = () => {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
-            <button
-              onClick={() => router.push("/signin")}
-              className="px-4 py-2 rounded-full border-2 border-primary text-primary font-medium bg-transparent hover:opacity-90 transition-all duration-150"
-            >
-              Log In
-            </button>
+            {/* Only show Sign Out when authenticated and not on auth pages */}
+            {isAuthenticated && !["/signin", "/signup"].includes(pathname || "") ? (
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut()
+                  router.push("/")
+                  router.refresh()
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-border text-foreground font-medium bg-transparent hover:bg-secondary transition-all duration-150"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => router.push("/signin")}
+                  className="px-4 py-2 rounded-full border-2 border-primary text-primary font-medium bg-transparent hover:opacity-90 transition-all duration-150"
+                >
+                  Log In
+                </button>
 
-            <button
-              onClick={() => router.push("/signup")}
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-base font-medium hover:opacity-90 transition-all duration-200 shadow-sm"
-            >
-              Sign Up
-            </button>
+                <button
+                  onClick={() => router.push("/signup?type=personal")}
+                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-base font-medium hover:opacity-90 transition-all duration-200 shadow-sm"
+                >
+                  Sign Up
+                </button>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}

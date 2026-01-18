@@ -2,6 +2,12 @@
 
 import { useState } from "react"
 import { supabase } from "../lib/supabaseClient"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+
+import { sendContactEmail } from "../app/actions"
 
 export default function ContactForm({ subject = "General inquiry" }: { subject?: string }) {
   const [name, setName] = useState("")
@@ -14,38 +20,93 @@ export default function ContactForm({ subject = "General inquiry" }: { subject?:
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    const payload = {
+    
+    // 1. Send Email
+    const emailResult = await sendContactEmail({
       name,
       email,
       company,
       message,
       subject,
-    }
-    // Insert into feedback table
-    try {
-      await supabase.from("feedback").insert([{ context: { subject }, message: JSON.stringify(payload) }])
+    })
+
+    if (emailResult.success) {
+      // 2. Optional: Still save to Supabase for redundancy/analytics
+      const payload = { name, email, company, message, subject }
+      try {
+        await supabase.from("feedback").insert([{ context: { subject }, message: JSON.stringify(payload) }])
+      } catch (err) {
+        console.error("Supabase backup failed:", err)
+      }
+      
       setSuccess(true)
-    } catch (err) {
-      console.error(err)
+    } else {
+      console.error("Email failed:", emailResult.error)
+      // Ideally show an error message to user, but for now we fallback or just log
+      alert("Something went wrong. Please try again.")
     }
+
     setLoading(false)
   }
 
-  if (success) return <div className="p-4 bg-card rounded">Thanks — we&apos;ll be in touch.</div>
+  if (success) return (
+    <div className="p-8 bg-green-50 text-green-800 rounded-xl border border-green-100 text-center">
+      <h3 className="text-lg font-semibold mb-2">Message Sent!</h3>
+      <p>Thanks for reaching out. We&apos;ll be in touch within 2 business days.</p>
+    </div>
+  )
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-2">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="p-2 rounded border" />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="p-2 rounded border" />
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input 
+                id="name"
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+                placeholder="Jane Doe" 
+                required
+            />
+        </div>
+        <div className="space-y-2">
+            <Label htmlFor="email">Work Email</Label>
+            <Input 
+                id="email"
+                type="email"
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                placeholder="jane@company.com" 
+                required
+            />
+        </div>
       </div>
-      <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company (optional)" className="w-full p-2 rounded border" />
-      <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Tell us about your needs" className="w-full p-2 rounded border" rows={6} />
-      <div className="flex gap-2">
-        <button disabled={loading} className="bg-primary text-primary-foreground px-4 py-2 rounded">
-          {loading ? "Sending..." : "Send"}
-        </button>
+      
+      <div className="space-y-2">
+        <Label htmlFor="company">Company Name</Label>
+        <Input 
+            id="company"
+            value={company} 
+            onChange={(e) => setCompany(e.target.value)} 
+            placeholder="Acme Corp (Optional)" 
+        />
       </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="message">How can we help?</Label>
+        <Textarea 
+            id="message"
+            value={message} 
+            onChange={(e) => setMessage(e.target.value)} 
+            placeholder="Tell us about your project/needs..." 
+            className="min-h-[120px]"
+            required
+        />
+      </div>
+
+      <Button disabled={loading} size="lg" className="w-full sm:w-auto">
+        {loading ? "Sending..." : "Send Message"}
+      </Button>
     </form>
   )
 }

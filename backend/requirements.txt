@@ -8,3 +8,4 @@ python-dotenv
 requests
 openfoodfacts
 python-multipart
+supabase

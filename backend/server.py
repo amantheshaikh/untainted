@@ -1098,9 +1098,12 @@ DIET_FALLBACK_TOKENS: Dict[str, Set[str]] = {
         "dextrose",
         "maltose",
     },
+
     "no-maida": {
         "maida",
         "refined wheat",
+        "bleached flour",
+        "white flour",
         "all purpose flour",
         "all-purpose flour",
     },
@@ -1117,7 +1120,49 @@ DIET_FALLBACK_TOKENS: Dict[str, Set[str]] = {
         "sugar syrup",
         "corn syrup",
     },
-}
+    "paleo": {
+        "sugar",
+        "refined sugar",
+        "grains",
+        "wheat",
+        "corn",
+        "rice",
+        "oats",
+        "barley",
+        "dairy",
+        "milk",
+        "cheese",
+        "yogurt",
+        "bean",
+        "legume",
+        "soy",
+        "peanut",
+        "vegetable oil",
+        "sunflower oil",
+        "canola oil",
+        "processed food",
+        "artificial sweetener",
+    },
+    "low-fodmap": {
+        "onion",
+        "garlic",
+        "wheat",
+        "rye",
+        "barley",
+        "milk",
+        "lactose",
+        "honey",
+        "agave",
+        "high fructose corn syrup",
+        "apple",
+        "pear",
+        "peach",
+        "plum",
+        "cauliflower",
+        "mushroom",
+        "bean",
+    },
+    }
 
 
 ALLERGY_FALLBACK_TOKENS: Dict[str, Set[str]] = {
@@ -1351,6 +1396,39 @@ def _build_diet_rules() -> Dict[str, Dict[str, Set[str]]]:
             "en:flour",
             "en:wheat",
         ],
+        "paleo": [
+            "en:sugar",
+            "en:grains",
+            "en:wheat",
+            "en:corn",
+            "en:rice",
+            "en:oats",
+            "en:barley",
+            "en:milk",
+            "en:cheese",
+            "en:dairy",
+            "en:soy",
+            "en:peanut",
+            "en:canola-oil",
+            "en:sunflower-oil",
+        ],
+        "low-fodmap": [
+            "en:onion",
+            "en:garlic",
+            "en:wheat",
+            "en:rye",
+            "en:barley",
+            "en:milk",
+            "en:honey",
+            "en:agave-syrup",
+            "en:high-fructose-corn-syrup",
+            "en:apple",
+            "en:pear",
+            "en:peach",
+            "en:plum",
+            "en:cauliflower",
+            "en:mushroom",
+        ],
     }
 
     rules: Dict[str, Dict[str, Set[str]]] = {}
@@ -1424,33 +1502,68 @@ def process_ingredients(
 ) -> Dict[str, Any]:
     normalizer = NORMALIZER or _ensure_normalizer()
     items = normalizer.normalize(text)
-    diet_pref = None
-    diet_rules = _get_diet_rules()
+
+    active_diets: Set[str] = set()
     allergy_tokens: Set[str] = set()
     allergy_labels: List[str] = []
     nutriments: Optional[Dict[str, Any]] = None
+
+    diet_rules = _get_diet_rules()
+
     if preferences and isinstance(preferences, dict):
-        # Accept either `diet` (backend API) or `dietaryPreference` (frontend profile JSON)
+        # 1. Handle "Legacy" single diet key
+        #    (Many clients might still send { "diet": "vegan" })
         raw_diet = preferences.get("diet") or preferences.get("dietaryPreference")
         if isinstance(raw_diet, str):
             lowered = raw_diet.lower().strip()
             if lowered in diet_rules:
-                diet_pref = lowered
+                active_diets.add(lowered)
+
+        # 2. Handle dietary_preferences list (e.g. ["Vegan", "Paleo"])
+        pref_list = preferences.get("dietary_preferences")
+        if isinstance(pref_list, (list, tuple, set)):
+            for item in pref_list:
+                if isinstance(item, str):
+                    lowered = item.lower().strip()
+                    dashed = lowered.replace(" ", "-")
+                    if lowered and lowered in diet_rules:
+                        active_diets.add(lowered)
+                    elif dashed and dashed in diet_rules:
+                        active_diets.add(dashed)
+        
+        # 3. Handle health_restrictions list (e.g. ["Keto", "Low FODMAP"])
+        health_list = preferences.get("health_restrictions")
+        if isinstance(health_list, (list, tuple, set)):
+            for item in health_list:
+                if isinstance(item, str):
+                    lowered = normalize_token(item) # "low fodmap"
+                    dashed = lowered.replace(" ", "-") # "low-fodmap"
+                    if lowered in diet_rules:
+                        active_diets.add(lowered)
+                    elif dashed in diet_rules:
+                        active_diets.add(dashed)
+                    # Try direct lower match if normalize changed too much
+                    elif item.lower().strip() in diet_rules:
+                        active_diets.add(item.lower().strip())
+
         raw_allergies = preferences.get("allergies")
         if isinstance(raw_allergies, (list, tuple, set)):
             labels, tokens = _normalize_allergy_preferences(raw_allergies)
             allergy_labels = labels
             allergy_tokens = tokens
+
     # accept nutriments passed via product_meta (OpenFoodFacts product dict)
     if isinstance(product_meta, dict):
         nutriments = product_meta.get("nutriments") or product_meta.get("nutriment")
 
-    is_clean, hits, diet_hits, allergy_hits = evaluate_items(
-        items, diet_pref, allergy_tokens, nutriments=nutriments
+    is_safe, hits, diet_hits, allergy_hits = evaluate_items(
+        items, list(active_diets), allergy_tokens, nutriments=nutriments
     )
+    
     display = [item.display for item in items]
     canonical = [item.canonical for item in items]
     taxonomy = [item.taxonomy for item in items if item.taxonomy]
+    
     if normalizer.taxonomy and normalizer.additives:
         source_label = "taxonomy+additives"
     elif normalizer.taxonomy:
@@ -1459,15 +1572,18 @@ def process_ingredients(
         source_label = "additives"
     else:
         source_label = "heuristic"
+
     return {
         "source": source_label,
         "ingredients": display,
         "canonical": canonical,
         "taxonomy": taxonomy,
-        "is_clean": is_clean,
+        "status": "safe" if is_safe else "not_safe",
+        "is_clean": is_safe, # Kept for backward compatibility if needed, but primary is status
         "hits": hits,
         "diet_hits": diet_hits,
-        "diet_preference": diet_pref,
+        "active_diets": sorted(list(active_diets)),
+        "diet_preference": active_diets.pop() if active_diets else None, # Legacy compat
         "allergy_hits": allergy_hits,
         "allergy_preferences": allergy_labels,
         "taxonomy_error": INGREDIENT_TAXONOMY_ERROR,
@@ -1477,7 +1593,7 @@ def process_ingredients(
 
 def evaluate_items(
     items: List[NormalizedIngredient],
-    diet_preference: Optional[str] = None,
+    diet_preferences: List[str],
     allergy_tokens: Optional[Set[str]] = None,
     nutriments: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, List[str], List[str], List[str]]:
@@ -1487,40 +1603,50 @@ def evaluate_items(
     allergy_hits: List[str] = []
     seen_allergies: Set[str] = set()
     diet_rules = _get_diet_rules()
-    rule: Optional[Dict[str, Set[str]]] = None
-    id_rule: Set[str] = set()
-    token_rule: Set[str] = set()
+
+    # Pre-fetch rules for all active diets
+    active_rules = []
+    for d in diet_preferences:
+        r = diet_rules.get(d)
+        if r:
+            active_rules.append((d, r["ids"], r["tokens"]))
+
     allergy_token_set: Set[str] = set(allergy_tokens or set())
-    if diet_preference:
-        possible_rule = diet_rules.get(diet_preference)
-        if possible_rule:
-            rule = possible_rule
-            id_rule = set(possible_rule.get("ids", set()))
-            token_rule = set(possible_rule.get("tokens", set()))
+    
     for item in items:
         token = item.canonical.replace("-", " ")
+        # 1. Global Forbidden Ingredients ("Toxic" / "Unclean")
         for forbidden in FORBIDDEN_NORMALIZED:
             if forbidden and forbidden in token:
                 hits.add(forbidden)
+        
         info = item.taxonomy or {}
         display_norm = normalize_token(info.get("display") or item.display)
+        
         if display_norm in FORBIDDEN_NORMALIZED:
             hits.add(display_norm)
+            
         for syn in info.get("synonyms") or []:
             syn_norm = normalize_token(syn)
             if syn_norm in FORBIDDEN_NORMALIZED:
                 hits.add(syn_norm)
+                
         node_id = info.get("id") if isinstance(info, dict) else None
         if node_id and (node_id in DEFAULT_FLAG_IDS or normalize_token(node_id.split(":", 1)[-1]) in FLAG_CANONICALS):
             hits.add(display_norm or token)
+
+        # 2. Diet & Health Rules
         item_ids, item_tokens = _collect_diet_signatures(item)
-        if rule:
-            has_conflict = bool(item_ids & id_rule) or bool(item_tokens & token_rule)
-            if has_conflict:
+        
+        for diet_name, id_rule, token_rule in active_rules:
+             has_conflict = bool(item_ids & id_rule) or bool(item_tokens & token_rule)
+             if has_conflict:
                 normalized_display = (item.display or item.canonical).strip()
                 if normalized_display and normalized_display.lower() not in seen_diet:
                     seen_diet.add(normalized_display.lower())
-                    diet_hits.append(normalized_display)
+                    diet_hits.append(f"{normalized_display} ({diet_name})")
+
+        # 3. Allergies
         if allergy_token_set:
             combined_tokens: Set[str] = set(item_tokens)
             for identifier in item_ids:
@@ -1535,23 +1661,16 @@ def evaluate_items(
                     if lowered_display not in seen_allergies:
                         seen_allergies.add(lowered_display)
                         allergy_hits.append(normalized_display)
-    # Nutriment-based checks: when OpenFoodFacts `nutriments` are available on the
-    # product dict, apply simple numeric rules to augment diet_hits for
-    # diabetic-friendly and keto preferences.
-    if nutriments and diet_preference:
-        def _num(val: Any) -> Optional[float]:
-            try:
-                return float(val)
-            except Exception:
-                return None
 
+    # Nutriment-based checks (Diabetes / Keto)
+    if nutriments:
         def _get_nutriment(keys: List[str]) -> Optional[float]:
             for k in keys:
                 if k in nutriments:
-                    v = nutriments.get(k)
-                    n = _num(v)
-                    if n is not None:
-                        return n
+                    try:
+                        return float(nutriments[k])
+                    except:
+                        pass
             return None
 
         sugars = _get_nutriment(["sugars_100g", "sugars", "sugar_100g", "sugars_value"])
@@ -1559,25 +1678,28 @@ def evaluate_items(
         fiber = _get_nutriment(["fiber_100g", "fiber"])
         net_carbs = None
         if carbs is not None:
-            net_carbs = carbs - (fiber or 0.0)
+             net_carbs = carbs - (fiber or 0.0)
 
-        # diabetic-friendly: flag high sugar content
-        if diet_preference == "diabetic-friendly" and sugars is not None:
-            if sugars >= DIABETIC_SUGARS_PER_100G_THRESHOLD:
-                label = f"high sugar ({sugars} g/100g)"
-                if label.lower() not in seen_diet:
-                    seen_diet.add(label.lower())
-                    diet_hits.append(label)
+        for diet_name in diet_preferences:
+            # diabetic-friendly: flag high sugar content
+            if diet_name == "diabetic-friendly" and sugars is not None:
+                if sugars >= DIABETIC_SUGARS_PER_100G_THRESHOLD:
+                    label = f"high sugar ({sugars} g/100g)"
+                    if label.lower() not in seen_diet:
+                        seen_diet.add(label.lower())
+                        diet_hits.append(label)
 
-        # keto: flag high net carbs
-        if diet_preference == "keto" and net_carbs is not None:
-            if net_carbs >= KETO_NET_CARBS_PER_100G_THRESHOLD:
-                label = f"high net carbs ({net_carbs:.1f} g/100g)"
-                if label.lower() not in seen_diet:
-                    seen_diet.add(label.lower())
-                    diet_hits.append(label)
+            # keto: flag high net carbs
+            if diet_name == "keto" and net_carbs is not None:
+                if net_carbs >= KETO_NET_CARBS_PER_100G_THRESHOLD:
+                    label = f"high net carbs ({net_carbs:.1f} g/100g)"
+                    if label.lower() not in seen_diet:
+                        seen_diet.add(label.lower())
+                        diet_hits.append(label)
 
-    return (len(hits) == 0), sorted(hits), diet_hits, allergy_hits
+    is_safe = (len(hits) == 0) and (len(diet_hits) == 0) and (len(allergy_hits) == 0)
+    
+    return is_safe, sorted(list(hits)), diet_hits, allergy_hits
 
     
 

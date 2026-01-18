@@ -54,8 +54,8 @@ export default function AboutPage() {
               </p>
 
               <p className="text-lg leading-relaxed">
-                Like DigiLocker became the system of record for your documents, we aim to become the{" "}
-                <span className="text-foreground font-medium">system of record for what&apos;s right for you</span>.
+                Just as PayPal became the default layer for online payments—used by millions of consumers and businesses globally, we aim to become the{" "}
+                <span className="text-foreground font-medium">default layer for identifying what&apos;s right for you</span>.
                 Create your profile once, and let every product decision be evaluated through it—automatically,
                 instantly, and personally.
               </p>
@@ -74,7 +74,10 @@ export default function AboutPage() {
             transition={{ duration: 0.6 }}
             className="space-y-8"
           >
-            <h2 className="text-3xl font-semibold text-foreground">The Ambition</h2>
+            <h2 className="text-3xl font-semibold text-foreground">Our Goal</h2>
+            <p className="text-2xl md:text-3xl font-medium leading-tight text-foreground/90 max-w-2xl">
+              We aim to power intelligence behind <span className="text-primary">1 out of every 3 purchases</span> made digitally.
+            </p>
 
             <div className="grid md:grid-cols-2 gap-6">
               <motion.div

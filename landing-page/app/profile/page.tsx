@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabaseClient"
+import { ProfileNavbar } from "@/components/ProfileNavbar"
+import { Footer } from "@/components/Footer"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 
 type Profile = {
   id?: string
@@ -9,10 +15,45 @@ type Profile = {
   profile_json?: any
 }
 
+// Full list of options derived from landing page analysis
+const DIETARY_PREFERENCES = [
+  "Vegan",
+  "Vegetarian", 
+  "Jain",
+  "Sattvic",
+  "Keto",
+  "Paleo",
+]
+
+const HEALTH_RESTRICTIONS = [
+  "Diabetic-Friendly",
+  "Low FODMAP",
+  "No Maida",
+  "No Onion-Garlic",
+]
+
+const ALLERGIES = [
+  "Gluten",
+  "Dairy",
+  "Nut",
+  "Soy",
+  "Egg",
+  "Shellfish",
+  "Fish",
+  "Sesame",
+]
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Local state for form fields
+  const [name, setName] = useState("")
+  const [selectedDiets, setSelectedDiets] = useState<string[]>([])
+  const [selectedHealth, setSelectedHealth] = useState<string[]>([])
+  const [selectedAllergies, setSelectedAllergies] = useState<string[]>([])
 
   useEffect(() => {
     let mounted = true
@@ -25,12 +66,21 @@ export default function ProfilePage() {
         return
       }
       const { data, error } = await supabase.from("profiles").select("*").eq("user_id", user.id).limit(1).single()
-      if (error && error.code !== "PGRST100") {
-        setError(error.message)
-      } else if (data) {
-        setProfile(data)
+      
+      if (mounted) {
+        if (error && error.code !== "PGRST100") {
+          setError(error.message)
+        } else if (data) {
+          setProfile(data)
+          // Initialize local state from profile_json
+          setName(data.name || "")
+          const json = data.profile_json || {}
+          setSelectedDiets(Array.isArray(json.dietary_preferences) ? json.dietary_preferences : [])
+          setSelectedHealth(Array.isArray(json.health_restrictions) ? json.health_restrictions : [])
+          setSelectedAllergies(Array.isArray(json.allergies) ? json.allergies : [])
+        }
+        setLoading(false)
       }
-      setLoading(false)
     }
     load()
     return () => {
@@ -38,112 +88,176 @@ export default function ProfilePage() {
     }
   }, [])
 
-  async function saveProfile(updated: any) {
-    const user = supabase.auth.getUser ? (await supabase.auth.getUser()).data.user : null
-    if (!user) return setError("Not signed in")
-    const payload = {
-      user_id: user.id,
-      name: updated.name,
-      profile_json: updated.profile_json,
-    }
-    if (profile && profile.id) {
-      await supabase.from("profiles").update(payload).eq("id", profile.id)
+  const toggleSelection = (item: string, list: string[], setList: (l: string[]) => void) => {
+    if (list.includes(item)) {
+      setList(list.filter((i) => i !== item))
     } else {
-      await supabase.from("profiles").insert(payload)
+      setList([...list, item])
     }
   }
 
-  if (loading) return <div className="p-6">Loading...</div>
-  if (error) return <div className="p-6 text-destructive">{error}</div>
+  async function saveProfile() {
+    setSaving(true)
+    const user = supabase.auth.getUser ? (await supabase.auth.getUser()).data.user : null
+    if (!user) {
+        setError("Not signed in")
+        setSaving(false)
+        return 
+    }
+
+    const profileJson = {
+      dietary_preferences: selectedDiets,
+      health_restrictions: selectedHealth,
+      allergies: selectedAllergies
+    }
+
+    const payload = {
+      user_id: user.id,
+      name: name,
+      profile_json: profileJson,
+    }
+
+    let err = null
+    if (profile && profile.id) {
+      const { error } = await supabase.from("profiles").update(payload).eq("id", profile.id)
+      err = error
+    } else {
+      const { error } = await supabase.from("profiles").insert(payload)
+      err = error
+    }
+
+    if (err) {
+        setError(err.message)
+    } else {
+        alert("Profile saved!")
+    }
+    setSaving(false)
+  }
+
+  if (loading) return (
+    <>
+      <ProfileNavbar />
+      <div className="min-h-screen pt-32 px-6 flex justify-center text-muted-foreground">Loading profile...</div>
+      <Footer />
+    </>
+  )
+
+  if (error && error !== "Not signed in") return (
+    <>
+      <ProfileNavbar />
+      <div className="min-h-screen pt-32 px-6 flex justify-center text-destructive">{error}</div>
+      <Footer />
+    </>
+  )
+
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
-      <div className="max-w-3xl mx-auto text-center mb-10">
-        <h2 className="text-sm font-semibold text-[#F58220] tracking-wider">Sign up for Untainted</h2>
-        <h1 className="mt-4 text-4xl md:text-5xl font-bold text-[#5D4632]">Know what’s safe. Instantly.</h1>
-        <p className="mt-4 text-lg text-[#7C6145]">Personalized food intelligence for people and platforms.</p>
-      </div>
+    <>
+      <ProfileNavbar />
+      <div className="min-h-screen pt-32 pb-20 bg-background">
+        <div className="max-w-3xl mx-auto px-6">
+          <div className="mb-10">
+            <h1 className="text-3xl font-bold text-foreground mb-2">Your Food Profile</h1>
+            <p className="text-muted-foreground">
+              Customize your dietary needs. This data is used to personalize your food analysis across platforms.
+            </p>
+          </div>
 
-      <div className="bg-white rounded-3xl p-8 shadow-lg border border-[#E8DFD4] mb-8">
-        <div className="grid md:grid-cols-2 gap-6 items-start">
-          <div className="p-6 rounded-2xl border border-[#E8DFD4] bg-white">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-[#F58220] flex items-center justify-center text-white font-bold">👤</div>
-              <div>
-                <h3 className="text-2xl font-semibold text-[#5D4632]">Individual</h3>
-                <p className="text-sm text-[#7C6145] mt-1">Eat with confidence. Made just for you.</p>
+          <div className="bg-card rounded-2xl border border-border p-8 shadow-sm space-y-8">
+            
+            {/* Name Section */}
+            <div className="space-y-3">
+              <Label htmlFor="name" className="text-base">Display Name</Label>
+              <Input 
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="How should we address you?" 
+                className="max-w-md"
+              />
+            </div>
+
+            <div className="h-px bg-border my-6" />
+
+            {/* Dietary Preferences */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                 <span className="text-xl">🥗</span>
+                 <h2 className="text-lg font-semibold">Dietary Preferences</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">Select all that apply to your lifestyle.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {DIETARY_PREFERENCES.map((pref) => (
+                  <div key={pref} className="flex items-center space-x-3 p-3 rounded-lg border border-transparent hover:bg-secondary/50 transition-colors">
+                    <Checkbox 
+                      id={`diet-${pref}`} 
+                      checked={selectedDiets.includes(pref)}
+                      onCheckedChange={() => toggleSelection(pref, selectedDiets, setSelectedDiets)}
+                    />
+                    <Label htmlFor={`diet-${pref}`} className="font-normal cursor-pointer flex-1">{pref}</Label>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <p className="mt-4 text-sm text-[#7C6145]">Understand whether a food product is safe for YOU.</p>
-            <ul className="mt-4 space-y-2 text-sm text-[#7C6145]">
-              <li>✔ Check products against your diet, allergies, and sensitivities</li>
-              <li>✔ Get clear ingredient-level explanations</li>
-              <li>✔ Save preferences and scan history</li>
-              <li>✔ Alerts when formulations change</li>
-            </ul>
+            <div className="h-px bg-border my-6" />
 
-            <div className="mt-6">
-              <a href="#profile-form" className="inline-block bg-[#F58220] text-white px-4 py-2 rounded-full">Edit your profile</a>
-            </div>
-          </div>
-
-          <div className="p-6 rounded-2xl border border-[#E8DFD4] bg-white">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-[#F58220] flex items-center justify-center text-white font-bold">🏢</div>
-              <div>
-                <h3 className="text-2xl font-semibold text-[#5D4632]">Business</h3>
-                <p className="text-sm text-[#7C6145] mt-1">Build food trust into your product.</p>
+            {/* Health Goals/Restrictions */}
+             <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                 <span className="text-xl">❤️</span>
+                 <h2 className="text-lg font-semibold">Health Goals & Restrictions</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {HEALTH_RESTRICTIONS.map((res) => (
+                  <div key={res} className="flex items-center space-x-3 p-3 rounded-lg border border-transparent hover:bg-secondary/50 transition-colors">
+                    <Checkbox 
+                      id={`health-${res}`} 
+                      checked={selectedHealth.includes(res)}
+                      onCheckedChange={() => toggleSelection(res, selectedHealth, setSelectedHealth)}
+                    />
+                    <Label htmlFor={`health-${res}`} className="font-normal cursor-pointer flex-1">{res}</Label>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <p className="mt-4 text-sm text-[#7C6145]">Integrate real-time food safety and personalization into your app or platform.</p>
-            <ul className="mt-4 space-y-2 text-sm text-[#7C6145]">
-              <li>✔ Generate and manage API keys</li>
-              <li>✔ Ingredient-level risk evaluation at scale</li>
-              <li>✔ Personalization based on user preferences</li>
-              <li>✔ Usage analytics and monitoring</li>
-              <li>✔ Built for q-commerce, food delivery, and retail</li>
-            </ul>
+            <div className="h-px bg-border my-6" />
 
-            <div className="mt-6">
-              <button onClick={() => (window.location.href = "/contact")} className="inline-block bg-[#F58220] text-white px-4 py-2 rounded-full">Contact Sales</button>
+            {/* Allergies */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                 <span className="text-xl">⚠️</span>
+                 <h2 className="text-lg font-semibold">Allergies & Sensitivities</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">Ingredients you absolutely need to avoid.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {ALLERGIES.map((allergy) => (
+                  <div key={allergy} className="flex items-center space-x-3 p-3 rounded-lg border border-transparent hover:bg-secondary/50 transition-colors">
+                    <Checkbox 
+                      id={`allergy-${allergy}`} 
+                      checked={selectedAllergies.includes(allergy)}
+                      onCheckedChange={() => toggleSelection(allergy, selectedAllergies, setSelectedAllergies)}
+                    />
+                    <Label htmlFor={`allergy-${allergy}`} className="font-normal cursor-pointer flex-1">{allergy}</Label>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <div id="profile-form" className="max-w-3xl mx-auto p-6 bg-white rounded-2xl border border-[#E8DFD4] shadow-sm">
-        <h2 className="text-2xl font-semibold mb-4">Your Dietary Profile</h2>
-        <p className="mb-4 text-sm text-[#8B7355]">Manage your allergies, dietary preferences, and restrictions here.</p>
-        <div className="space-y-4">
-          <label className="block">
-            <div className="text-sm text-[#7C6145] mb-1">Name</div>
-            <input defaultValue={profile?.name || ""} className="w-full p-3 rounded-lg border border-[#E8DFD4]" id="profile-name" />
-          </label>
-          <label className="block">
-            <div className="text-sm text-[#7C6145] mb-1">Profile JSON (preferences & allergies)</div>
-            <textarea defaultValue={JSON.stringify(profile?.profile_json || {}, null, 2)} id="profile-json" className="w-full p-3 rounded-lg border border-[#E8DFD4] font-mono text-sm" rows={10} />
-          </label>
-          <div className="flex gap-2">
-            <button
-              onClick={async () => {
-                const name = (document.getElementById("profile-name") as HTMLInputElement).value
-                let parsed = {}
-                try {
-                  parsed = JSON.parse((document.getElementById("profile-json") as HTMLTextAreaElement).value)
-                } catch (e) {
-                  return setError("Invalid JSON in profile")
-                }
-                await saveProfile({ name, profile_json: parsed })
-                setError(null)
-              }}
-              className="bg-[#F58220] text-white px-4 py-2 rounded-full"
-            >
-              Save profile
-            </button>
+            <div className="pt-6 flex justify-end">
+              <Button 
+                onClick={saveProfile} 
+                disabled={saving}
+                className="px-8 text-base py-6 rounded-xl"
+              >
+                {saving ? "Saving..." : "Save Profile"}
+              </Button>
+            </div>
+
           </div>
         </div>
       </div>
-    </div>
+      <Footer />
+    </>
   )
 }

@@ -169,7 +169,7 @@ export const Footer = () => {
                 <Github className="w-4 h-4" />
               </a>
               <a
-                href="mailto:hello@untainted.com"
+                href="mailto:hello@untainted.io"
                 className="w-9 h-9 flex items-center justify-center rounded-full bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors duration-150"
                 aria-label="Email"
               >

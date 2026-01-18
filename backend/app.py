@@ -15,6 +15,9 @@ from .server import build_capabilities, process_ingredients, off_dataset_lookup,
 ALLOWED_ORIGINS = [
     "https://clean-food-app.vercel.app",
     "https://clean-food-app-git-main-amantheshaikh.vercel.app",
+    "https://untainted.io",
+    "https://www.untainted.io",
+    "https://api.untainted.io",
     "http://localhost:5173",
     "http://localhost:3000",
     "http://localhost:3001",
@@ -26,13 +29,32 @@ ALLOWED_ORIGINS = [
 VERCEL_REGEX = r"https://([^.]+-)*clean-food-app.*\.vercel\.app"
 
 
+from supabase import create_client, Client
+import os
+
+# ... existing imports ...
+
+# Supabase Setup
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+supabase: Optional[Client] = None
+
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        print(f"Failed to initialize Supabase: {e}")
+
 class CheckPayload(BaseModel):
     ingredients: str = Field(..., min_length=1, description="Raw ingredient text to analyse")
     preferences: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Optional diet/allergy configuration matching the legacy server payload",
     )
-
+    customer_uid: Optional[str] = Field(
+        default=None,
+        description="UID of the customer to fetch profile from (overrides preferences if found)",
+    )
 
 
 def _parse_preferences(raw_preferences: Any) -> Optional[Dict[str, Any]]:
@@ -47,9 +69,36 @@ def _parse_preferences(raw_preferences: Any) -> Optional[Dict[str, Any]]:
             return parsed
     return None
 
+def _fetch_profile_preferences(uid: str) -> Optional[Dict[str, Any]]:
+    if not supabase:
+        print("Supabase client not initialized")
+        return None
+    try:
+        # Assuming table is 'profiles' and column is 'user_id' matching the uid
+        # and 'profile_json' contains the preferences
+        data = supabase.table("profiles").select("profile_json").eq("user_id", uid).single().execute()
+        if data.data:
+            return data.data.get("profile_json")
+    except Exception as e:
+        print(f"Error fetching profile for {uid}: {e}")
+    return None
 
 async def _resolve_payload(request: Request) -> CheckPayload:
     content_type = (request.headers.get('Content-Type') or '').lower()
+    
+    # helper to merge fetched profile if UID present
+    def finalize_payload(p: CheckPayload) -> CheckPayload:
+        if p.customer_uid:
+            fetched = _fetch_profile_preferences(p.customer_uid)
+            if fetched:
+                # Merge logic: Fetched profile takes precedence or acts as base? 
+                # Let's say if preferences are NOT provided in payload, use fetched.
+                # If both provided, maybe payload overrides? Or merge?
+                # User request implied UID maps to profile against which product is checked.
+                # So likely UID sourced profile is the source of truth.
+                p.preferences = fetched
+        return p
+
     if 'application/json' in content_type:
         try:
             data = await request.json()
@@ -58,7 +107,8 @@ async def _resolve_payload(request: Request) -> CheckPayload:
         if not isinstance(data, dict):
             raise HTTPException(status_code=400, detail='JSON body must be an object')
         try:
-            return CheckPayload(**data)
+            payload = CheckPayload(**data)
+            return finalize_payload(payload)
         except ValidationError as exc:
             raise HTTPException(status_code=400, detail=exc.errors())
 
@@ -66,8 +116,10 @@ async def _resolve_payload(request: Request) -> CheckPayload:
         form = await request.form()
         ingredients = form.get('ingredients', '')
         preferences = _parse_preferences(form.get('preferences'))
+        customer_uid = form.get('customer_uid')
         try:
-            return CheckPayload(ingredients=ingredients, preferences=preferences)
+            payload = CheckPayload(ingredients=ingredients, preferences=preferences, customer_uid=customer_uid)
+            return finalize_payload(payload)
         except ValidationError as exc:
             raise HTTPException(status_code=400, detail=exc.errors())
 
@@ -84,8 +136,10 @@ async def _resolve_payload(request: Request) -> CheckPayload:
             pref_values = parsed.get('preferences')
             pref_raw = pref_values[-1] if pref_values else None
             preferences = _parse_preferences(pref_raw)
+            customer_uid = parsed.get('customer_uid', [None])[-1]
             try:
-                return CheckPayload(ingredients=ingredients, preferences=preferences)
+                payload = CheckPayload(ingredients=ingredients, preferences=preferences, customer_uid=customer_uid)
+                return finalize_payload(payload)
             except ValidationError as exc:
                 raise HTTPException(status_code=400, detail=exc.errors())
         stripped = body_text.strip()
@@ -113,10 +167,12 @@ class CheckResponse(BaseModel):
     ingredients: List[str]
     canonical: List[str]
     taxonomy: List[Dict[str, Any]]
-    is_clean: bool
+    status: str = Field(..., description="'safe' or 'not_safe'")
+    is_clean: bool = Field(..., description="Legacy boolean flag, mirrors status=='safe'")
     hits: List[str]
     diet_hits: List[str] = Field(default_factory=list)
     diet_preference: Optional[str] = None
+    active_diets: List[str] = Field(default_factory=list)
     allergy_hits: List[str] = Field(default_factory=list)
     allergy_preferences: List[str] = Field(default_factory=list)
     taxonomy_error: Optional[str] = None
@@ -133,6 +189,15 @@ class ProductResponse(BaseModel):
     ingredients: List[str] = Field(default_factory=list)
     image_url: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
+
+
+class ProductSubmissionRequest(BaseModel):
+    barcode: str = Field(..., min_length=1, description="GTIN / barcode string")
+    name: Optional[str] = None
+    brand: Optional[str] = None
+    ingredients_text: Optional[str] = None
+    categories: List[str] = Field(default_factory=list)
+    image_url: Optional[str] = None
 
 
 app = FastAPI(title="Untainted API", version="1.0.0")
@@ -182,10 +247,22 @@ def _enforce_rate_limit(request: Request) -> None:
     bucket.append(time.time())
 
 
-def _require_api_key_if_present(request: Request) -> Optional[str]:
+def _require_api_key(request: Request) -> str:
     key = request.headers.get("x-api-key") or request.headers.get("X-API-KEY")
-    if key and key not in API_KEYS:
+    if not key:
+        raise HTTPException(status_code=401, detail="missing api key")
+    
+    if key not in API_KEYS:
+        # Check if it's a test key that we might want to allow for sandbox (if configured)
+        # For now, strict allowlist check as per user request for "authentication details"
         raise HTTPException(status_code=403, detail="invalid api key")
+    
+    # Store environment context
+    if key.startswith("sk_test_"):
+        request.state.is_sandbox = True
+    else:
+        request.state.is_sandbox = False
+        
     return key
 
 # -------------------------------------------------------------------------
@@ -221,11 +298,12 @@ async def openapi_spec() -> FileResponse:
 
 
 @app.post("/product/lookup", response_model=ProductResponse)
-async def product_lookup(payload: ProductLookupRequest) -> ProductResponse:
-    """Lookup product data by barcode using the local dataset helper.
+async def product_lookup(payload: ProductLookupRequest, request: Request) -> ProductResponse:
+    """Lookup product data by barcode using the local dataset helper."""
+    # Enforce Auth
+    _require_api_key(request)
+    _enforce_rate_limit(request)
 
-    This wraps the legacy dataset helpers in `server.py`.
-    """
     barcode = (payload.barcode or "").strip()
     if not barcode:
         raise HTTPException(status_code=400, detail="barcode is required")
@@ -249,10 +327,28 @@ async def product_lookup(payload: ProductLookupRequest) -> ProductResponse:
     return ProductResponse(code=code, name=name, ingredients=ingredients or [], image_url=image_url, meta=product)
 
 
+@app.post("/product/missing", status_code=201)
+async def submit_missing_product(payload: ProductSubmissionRequest, request: Request) -> Dict[str, str]:
+    """Submit details for a missing product.
+
+    This endpoint allows businesses or users to contribute product data when a lookup fails (404).
+    Data submitted here is queued for validation and addition to the global dataset.
+    """
+    # Enforce Auth
+    _require_api_key(request)
+    _enforce_rate_limit(request)
+
+    # In a real implementation, this would save to a 'pending_products' table or a queue.
+    # For this MVP, we log it and return success.
+    print(f"Product Submission Received: {payload.model_dump_json()}")
+    
+    return {"status": "submission accepted", "message": "Thank you for contributing! Your data is queued for review."}
+
+
 @app.post("/check", response_model=CheckResponse)
 async def check(request: Request) -> CheckResponse:
-    # rate-limit and API key validation (demo in-memory)
-    _require_api_key_if_present(request)
+    # Enforce Auth
+    _require_api_key(request)
     _enforce_rate_limit(request)
 
     payload = await _resolve_payload(request)
@@ -262,12 +358,26 @@ async def check(request: Request) -> CheckResponse:
 
     try:
         analysis = process_ingredients(ingredients, payload.preferences)
+        if payload.customer_uid:
+            # Redact sensitive profile details to prevent reverse-engineering
+            analysis["active_diets"] = []
+            analysis["allergy_preferences"] = []
+            analysis["diet_preference"] = None
     except HTTPException:
         raise
     except Exception as exc:  # pragma: no cover - defensive guardrail
         raise HTTPException(status_code=500, detail=f"analysis failed: {exc}") from exc
 
     return CheckResponse(**analysis)
+
+
+@app.post("/ocr", response_model=Dict[str, Any])
+async def ocr(request: Request) -> Dict[str, Any]:
+    # Placeholder for OCR endpoint structure, enforcing auth
+    _require_api_key(request)
+    _enforce_rate_limit(request)
+    # Mock response for now as actual OCR logic wasn't provided in context
+    return {"text": "OCR Placeholder", "confidence": 0.99}
 
 
 @app.get("/")

@@ -3,32 +3,51 @@ info:
   title: Untainted API
   version: 1.0.0
   description: |
-    API for food ingredient analysis, product lookup and user-scoped data (preferences, history, feedback).
-    - Analysis and product/ocr endpoints are intended to be hosted on Fly.io (containerized Python service).
-    - User-scoped endpoints (preferences, history, feedback, signup) are intended to be served from Supabase (Auth + Postgres / Edge Functions).
+    Untainted provides a robust **food intelligence layer** for platforms.
+    Our API enables quick-commerce, grocery, and health apps to deliver personalized safety checks for millions of users.
+
+    ## Authentication
+    This API requires an API key for all secure endpoints.
+    Include your key in the `x-api-key` header of your request.
+    
+    Keys come in two variants:
+    - **Live (`sk_live_...`)**: Production environment. Hits are billed and affect production data.
+    - **Test (`sk_test_...`)**: Sandbox environment. Use these for development and testing integration.
+
+    ## Core Capability: Safety Checks
+    The `/check` endpoint is the heart of the Untainted stack. It determines if a product is "safe" or "not_safe" for a specific customer based on their unique profile (diets, allergies, health goals).
+
+    **Workflow:**
+    1.  **Identify**: Analyze a product's ingredient list.
+    2.  **Contextualize**: Apply the customer's specific profile (passed as preferences or via UID).
+    3.  **Decide**: Receive a binary `status` ("safe" | "not_safe") along with detailed conflict reasoning.
+
+    ## Product Contribution
+    Untainted maintains a comprehensive database of food products.
+    We encourage partners to contribute missing data to expand the shared intelligence network.
+
+    **Submission Workflow:**
+    1.  **Lookup**: Call `/product/lookup` with a barcode.
+    2.  **Not Found**: If you receive a `404 Not Found`, proceed to step 3.
+    3.  **Submit**: Call `/product/missing` (POST) with the barcode and details.
+    
+    Data submitted is validated before merging into the master dataset.
+
   contact:
     name: Untainted
-    url: https://clean-food.app
+    url: https://untainted.io
 
 servers:
-  - url: https://api.clean-food.app
-    description: Production API (Fly.io - analysis & product services)
-  - url: https://{supabase_project}.supabase.co
-    description: Supabase project (user-auth, data, edge functions)
-    variables:
-      supabase_project:
-        default: supabase-project
+  - url: https://api.untainted.io
+    description: Production API (Fly.io)
 
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-    serviceApiKey:
+    ApiKeyAuth:
       type: apiKey
       in: header
-      name: x-service-key
+      name: x-api-key
+
 
   schemas:
     CheckRequest:
@@ -42,6 +61,9 @@ components:
         preferences:
           type: object
           description: Optional user preferences, allergies or diet constraints
+        customer_uid:
+          type: string
+          description: Optional UID of the customer to fetch profile from (overrides preferences)
 
     Reason:
       type: object
@@ -112,6 +134,27 @@ components:
         meta:
           type: object
 
+    ProductSubmissionRequest:
+      type: object
+      required:
+        - barcode
+      properties:
+        barcode:
+          type: string
+          description: GTIN / barcode string
+        name:
+          type: string
+        brand:
+          type: string
+        ingredients_text:
+          type: string
+        categories:
+          type: array
+          items:
+            type: string
+        image_url:
+          type: string
+
     OCRResponse:
       type: object
       properties:
@@ -120,31 +163,8 @@ components:
         confidence:
           type: number
 
-    PreferencePayload:
-      type: object
-      properties:
-        avoid:
-          type: array
-          items:
-            type: string
-        allergies:
-          type: array
-          items:
-            type: string
-        preferences:
-          type: array
-          items:
-            type: string
-
-    FeedbackPayload:
-      type: object
-      required:
-        - message
-      properties:
-        message:
-          type: string
-        context:
-          type: object
+security:
+  - ApiKeyAuth: []
 
 paths:
   /healthz:
@@ -177,7 +197,6 @@ paths:
       summary: Analyze ingredient list and return verdict
       description: |
         Primary analysis endpoint. Accepts application/json or form-encoded data.
-        When deployed to Fly.io this endpoint will be the low-latency analysis service.
       requestBody:
         required: true
         content:
@@ -218,6 +237,33 @@ paths:
         '404':
           description: Product not found
 
+  /product/missing:
+    post:
+      summary: Submit details for a missing product
+      description: |
+        Use this endpoint when a /product/lookup returns 404.
+        Contributed data allows us to expand our dataset coverage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductSubmissionRequest'
+      responses:
+        '201':
+          description: Submission accepted and queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+        '400':
+          description: Invalid data (missing barcode)
+
   /ocr:
     post:
       summary: OCR extraction from uploaded image
@@ -241,91 +287,6 @@ paths:
         '400':
           description: Invalid upload
 
-  /user/signup:
-    post:
-      summary: Create a user account (proxy to Supabase Auth / Edge Function)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                password:
-                  type: string
-      responses:
-        '200':
-          description: Signup initiated (email confirmation may be required)
 
-  /user/preferences:
-    get:
-      summary: Retrieve current user's preferences
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Preferences
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PreferencePayload'
 
-    post:
-      summary: Update current user's preferences
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PreferencePayload'
-      responses:
-        '200':
-          description: Saved
 
-  /user/history:
-    get:
-      summary: Get analysis history for the authenticated user
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 50
-      responses:
-        '200':
-          description: History records
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AnalysisResponse'
-
-  /feedback:
-    post:
-      summary: Submit feedback or ingredient corrections
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/FeedbackPayload'
-      responses:
-        '201':
-          description: Created
-
-security: []
-
-tags:
-  - name: analysis
-    description: Analysis, OCR and product lookup endpoints (hosted on Fly.io)
-  - name: user
-    description: User-scoped endpoints (hosted on Supabase)
