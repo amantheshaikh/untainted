@@ -12,13 +12,15 @@ ENV PYTHONPATH=/app
 
 WORKDIR /app
 
-COPY requirements.txt ./requirements.txt
+# Copy only the backend folder into the image. When Fly builds remotely the
+# build context is the repository root, so reference the backend files with
+# their relative paths from the repo root.
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . /app/backend
-COPY server.py ./server.py
-COPY additives.txt ./additives.txt
-COPY ingredients.txt ./ingredients.txt
+# Place the package under /app/backend so the module path `backend.app` works
+# the same way it does locally.
+COPY backend/ /app/backend
 
 EXPOSE 8080
 CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8080"]
