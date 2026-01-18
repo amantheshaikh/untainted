@@ -11,7 +11,9 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 
-export default function SignInPage() {
+import { Suspense } from "react"
+
+function SignInContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [step, setStep] = useState<1 | 2>(1)
@@ -146,5 +148,13 @@ export default function SignInPage() {
       </div>
       <Footer />
     </>
+  )
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignInContent />
+    </Suspense>
   )
 }
