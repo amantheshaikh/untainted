@@ -1,0 +1,170 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Menu, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+
+const navigationLinks = [
+  { name: "For Business", href: "#for-business" },
+  { name: "For Personal", href: "#for-personal" },
+  { name: "How It Works", href: "#how-it-works" },
+  { name: "Pricing", href: "#pricing" },
+]
+
+export const Navbar = () => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20)
+    }
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  // no auth dropdown click handler needed anymore (we use explicit buttons)
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen)
+  }
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false)
+  }
+
+  const handleLinkClick = (href: string) => {
+  closeMobileMenu()
+    // If it's an anchor/hash link, scroll to the element on the page.
+    if (href.startsWith("#")) {
+      const element = document.querySelector(href)
+      if (element) element.scrollIntoView({ behavior: "smooth" })
+      return
+    }
+
+    // Otherwise, use Next.js navigation for app routes.
+    try {
+      // router is defined below in the component body
+      // (we declare it early so hooks order stays stable)
+      ;(router as any)?.push(href)
+    } catch (e) {
+      // fallback: attempt to navigate using location
+      window.location.href = href
+    }
+  }
+
+  const router = useRouter()
+
+  return (
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled ? "bg-background/95 backdrop-blur-md shadow-sm" : "bg-transparent"
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20">
+          {/* Logo */}
+          <div className="flex-shrink-0">
+            <button
+              onClick={() => handleLinkClick("#home")}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-200"
+            >
+              <img src="/images/full-20logo.png" alt="Untainted" className="h-8" />
+            </button>
+          </div>
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:block">
+            <div className="ml-10 flex items-baseline gap-8">
+              {navigationLinks.map((link) => (
+                <button
+                  key={link.name}
+                  onClick={() => handleLinkClick(link.href)}
+                  className="text-foreground/80 hover:text-foreground px-3 py-2 text-base font-medium transition-colors duration-200 relative group"
+                >
+                  <span>{link.name}</span>
+                  <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="hidden md:flex items-center gap-3">
+            <button
+              onClick={() => router.push("/signin")}
+              className="px-4 py-2 rounded-full border-2 border-primary text-primary font-medium bg-transparent hover:opacity-90 transition-all duration-150"
+            >
+              Log In
+            </button>
+
+            <button
+              onClick={() => router.push("/signup")}
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-base font-medium hover:opacity-90 transition-all duration-200 shadow-sm"
+            >
+              Sign Up
+            </button>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
+            <button
+              onClick={toggleMobileMenu}
+              className="text-foreground hover:text-primary p-2 rounded-md transition-colors duration-200"
+              aria-label="Toggle mobile menu"
+            >
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="md:hidden bg-background/95 backdrop-blur-md border-t border-border"
+          >
+            <div className="px-6 py-6 space-y-4">
+              {navigationLinks.map((link) => (
+                <button
+                  key={link.name}
+                  onClick={() => handleLinkClick(link.href)}
+                  className="block w-full text-left text-foreground hover:text-primary py-3 text-lg font-medium transition-colors duration-200"
+                >
+                  <span>{link.name}</span>
+                </button>
+              ))}
+
+              <div className="pt-4 border-t border-border space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Account</p>
+                <button
+                  onClick={() => {
+                    closeMobileMenu()
+                    router.push("/signin")
+                  }}
+                  className="w-full flex items-center gap-3 border-2 border-primary text-primary px-4 py-3 rounded-xl font-medium hover:opacity-90 transition-all duration-200"
+                >
+                  Log In
+                </button>
+                <button
+                  onClick={() => {
+                    closeMobileMenu()
+                    router.push("/signup")
+                  }}
+                  className="w-full flex items-center gap-3 bg-primary text-primary-foreground px-4 py-3 rounded-xl font-medium hover:opacity-90 transition-all duration-200"
+                >
+                  Sign Up
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </nav>
+  )
+}

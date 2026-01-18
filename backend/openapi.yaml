@@ -1,0 +1,331 @@
+openapi: 3.0.3
+info:
+  title: Untainted API
+  version: 1.0.0
+  description: |
+    API for food ingredient analysis, product lookup and user-scoped data (preferences, history, feedback).
+    - Analysis and product/ocr endpoints are intended to be hosted on Fly.io (containerized Python service).
+    - User-scoped endpoints (preferences, history, feedback, signup) are intended to be served from Supabase (Auth + Postgres / Edge Functions).
+  contact:
+    name: Untainted
+    url: https://clean-food.app
+
+servers:
+  - url: https://api.clean-food.app
+    description: Production API (Fly.io - analysis & product services)
+  - url: https://{supabase_project}.supabase.co
+    description: Supabase project (user-auth, data, edge functions)
+    variables:
+      supabase_project:
+        default: supabase-project
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    serviceApiKey:
+      type: apiKey
+      in: header
+      name: x-service-key
+
+  schemas:
+    CheckRequest:
+      type: object
+      required:
+        - ingredients
+      properties:
+        ingredients:
+          type: string
+          description: Raw ingredient text (one or multiple lines) or pasted list
+        preferences:
+          type: object
+          description: Optional user preferences, allergies or diet constraints
+
+    Reason:
+      type: object
+      properties:
+        ingredient:
+          type: string
+        category:
+          type: string
+        conflicts_with:
+          type: array
+          items:
+            type: string
+
+    AnalysisResponse:
+      type: object
+      properties:
+        product:
+          type: string
+          nullable: true
+        verdict:
+          type: string
+          description: SAFE | CAUTION | NOT_SAFE
+        confidence:
+          type: number
+          format: float
+          description: 0..1
+        flagged_ingredients:
+          type: array
+          items:
+            type: string
+        reasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reason'
+        safe_alternatives:
+          type: array
+          items:
+            type: string
+        processing_time_ms:
+          type: integer
+          format: int32
+        raw:
+          type: object
+          description: Raw diagnostic payload (taxonomies, hits, etc.)
+
+    ProductLookupRequest:
+      type: object
+      required:
+        - barcode
+      properties:
+        barcode:
+          type: string
+          description: GTIN / barcode string
+
+    Product:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        ingredients:
+          type: array
+          items:
+            type: string
+        image_url:
+          type: string
+        meta:
+          type: object
+
+    OCRResponse:
+      type: object
+      properties:
+        text:
+          type: string
+        confidence:
+          type: number
+
+    PreferencePayload:
+      type: object
+      properties:
+        avoid:
+          type: array
+          items:
+            type: string
+        allergies:
+          type: array
+          items:
+            type: string
+        preferences:
+          type: array
+          items:
+            type: string
+
+    FeedbackPayload:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        context:
+          type: object
+
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+
+  /capabilities:
+    get:
+      summary: Service capabilities / feature flags
+      responses:
+        '200':
+          description: Capabilities
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /check:
+    post:
+      summary: Analyze ingredient list and return verdict
+      description: |
+        Primary analysis endpoint. Accepts application/json or form-encoded data.
+        When deployed to Fly.io this endpoint will be the low-latency analysis service.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CheckRequest'
+      responses:
+        '200':
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+        '400':
+          description: Bad request
+        '500':
+          description: Internal error
+
+  /product/lookup:
+    post:
+      summary: Lookup product by barcode / product code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductLookupRequest'
+      responses:
+        '200':
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Product not found
+
+  /ocr:
+    post:
+      summary: OCR extraction from uploaded image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: OCR result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OCRResponse'
+        '400':
+          description: Invalid upload
+
+  /user/signup:
+    post:
+      summary: Create a user account (proxy to Supabase Auth / Edge Function)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Signup initiated (email confirmation may be required)
+
+  /user/preferences:
+    get:
+      summary: Retrieve current user's preferences
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferencePayload'
+
+    post:
+      summary: Update current user's preferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreferencePayload'
+      responses:
+        '200':
+          description: Saved
+
+  /user/history:
+    get:
+      summary: Get analysis history for the authenticated user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: History records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisResponse'
+
+  /feedback:
+    post:
+      summary: Submit feedback or ingredient corrections
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackPayload'
+      responses:
+        '201':
+          description: Created
+
+security: []
+
+tags:
+  - name: analysis
+    description: Analysis, OCR and product lookup endpoints (hosted on Fly.io)
+  - name: user
+    description: User-scoped endpoints (hosted on Supabase)

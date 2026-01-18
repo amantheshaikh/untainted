@@ -1,0 +1,12 @@
+app = "untainted"
+primary_region = "iad"
+
+[build]
+  # Use the backend Dockerfile to build the Fly image
+  dockerfile = "backend/Dockerfile"
+
+[env]
+# Set runtime environment variables via `flyctl secrets set` (do not store secrets here)
+# Example placeholders:
+# SUPABASE_URL = ""
+# SUPABASE_SERVICE_ROLE_KEY = ""
