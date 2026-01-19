@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     "API-first intelligence layer that helps platforms make safer, smarter, and more personalized product decisions for their users at the moment of purchase.",
   generator: "v0.app",
   icons: {
-    icon: "/icon.svg",
+    icon: "/favicon.svg",
   },
 }
 

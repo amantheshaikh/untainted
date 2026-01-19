@@ -41,9 +41,19 @@ export const Navbar = () => {
   const handleLinkClick = (href: string) => {
   closeMobileMenu()
     // If it's an anchor/hash link, scroll to the element on the page.
+    // If it's an anchor/hash link
     if (href.startsWith("#")) {
+      // If we're not on the home page, navigate to home with the hash
+      if (pathname !== "/") {
+        router.push("/" + href)
+        return
+      }
+      
+      // If we are on home page, scroll to element
       const element = document.querySelector(href)
-      if (element) element.scrollIntoView({ behavior: "smooth" })
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" })
+      }
       return
     }
 
