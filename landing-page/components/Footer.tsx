@@ -190,7 +190,7 @@ export const Footer = () => {
               transition={{ duration: 0.5, delay: index * 0.1 }}
               className="col-span-1"
             >
-              <h4 className="text-sm font-medium text-foreground mb-4 uppercase tracking-wide">{section.title}</h4>
+              <h3 className="text-sm font-medium text-foreground mb-4 uppercase tracking-wide">{section.title}</h3>
               <ul className="space-y-3">
                 {section.links.map((link) => (
                   <li key={link.label}>

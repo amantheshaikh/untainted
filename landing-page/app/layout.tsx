@@ -42,7 +42,7 @@ export default function RootLayout({
         className={`${inter.variable} ${figtree.variable} ${geistMono.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
-        {children}
+        <main>{children}</main>
         <Analytics />
       </body>
     </html>
