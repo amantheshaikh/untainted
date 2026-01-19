@@ -288,14 +288,7 @@ async def capabilities() -> Dict[str, Any]:
     return build_capabilities()
 
 
-@app.get("/openapi.yaml")
-async def openapi_spec() -> FileResponse:
-    """Serve the authoritative OpenAPI YAML for the service."""
-    spec_path = Path(__file__).resolve().parent / "openapi.yaml"
-    if not spec_path.exists():
-        raise HTTPException(status_code=404, detail="openapi.yaml not found")
-    # Return YAML with permissive CORS header to ensure the docs UI can fetch it from localhost dev
-    return FileResponse(spec_path, media_type="application/x-yaml", headers={"Access-Control-Allow-Origin": "*"})
+
 
 
 @app.post("/product/lookup", response_model=ProductResponse)

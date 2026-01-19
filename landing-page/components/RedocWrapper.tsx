@@ -6,14 +6,14 @@ import { Navbar } from "@/components/Navbar"
 import { Footer } from "@/components/Footer"
 
 interface RedocWrapperProps {
-  spec: object
+  specUrl?: string
+  spec?: object
 }
 
-export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
+export const RedocWrapper = ({ spec, specUrl = "/openapi.yaml" }: RedocWrapperProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [isScriptLoaded, setIsScriptLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-
 
   useEffect(() => {
      let isMounted = true;
@@ -28,7 +28,7 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
              containerRef.current.appendChild(redocContainer);
              
              (window as any).Redoc.init(
-                spec,
+                spec || specUrl,
                 {
                   scrollYOffset: 64,
                   hideDownloadButton: true,
@@ -39,13 +39,14 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
                   theme: {
                     colors: {
                       primary: {
-                        main: "#D65D26",
+                        main: "#D65D26", // Primary Orange
                       },
                     },
                     typography: {
                       fontFamily: "var(--font-inter)",
                       headings: {
                         fontFamily: "var(--font-figtree)",
+                        fontWeight: "700",
                       },
                     },
                   },
@@ -57,9 +58,6 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
 
      if ((window as any).Redoc) {
          safeInit()
-     } else {
-        // Retry once after short delay just in case script onload race condition
-        setTimeout(safeInit, 100)
      }
 
      return () => {
@@ -82,8 +80,8 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
                 // Ignore if already removed
             }
         }
-     }
-  }, [spec])
+      }
+  }, [spec, specUrl, isScriptLoaded]) // Depend on isScriptLoaded
   
   useEffect(() => {
     // Intercept history.replaceState/pushState to prevent Redoc from polluting the URL with hashes
@@ -141,14 +139,7 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
         src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"
         strategy="lazyOnload"
         onLoad={() => {
-            // Trigger a re-render or let useEffect pick it up
-            // Since useEffect depends on [spec], we can force an update or just rely on the race check
-            // Simpler: dispatch a custom event or just set a flag.
-            // Actually, best way is to let the component re-render.
-            // But for now, we can just manually call the init logic if we were strictly outside React.
-            // Since we are inside, best to rely on state or Ref.
-            // Let's just force update via state dummy
-            setError(null) // This triggers re-render
+            setIsScriptLoaded(true)
         }}
         onError={() => setError("Failed to load Redoc script")}
       />

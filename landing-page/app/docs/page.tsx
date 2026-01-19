@@ -1,5 +1,4 @@
 import { RedocWrapper } from "@/components/RedocWrapper"
-import { openApiSpec } from "@/lib/openapi"
 
 export const metadata = {
   title: "API Reference - Untainted Docs",
@@ -7,5 +6,5 @@ export const metadata = {
 }
 
 export default function ApiReferencePage() {
-  return <RedocWrapper spec={openApiSpec} />
+  return <RedocWrapper />
 }

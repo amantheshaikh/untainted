@@ -23,12 +23,16 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Untainted - Product Intelligence API for Safer, Smarter Decisions",
+  title: "Untainted – Food Intelligence API for Safer, Personalized Decisions",
   description:
-    "API-first intelligence layer that helps platforms make safer, smarter, and more personalized product decisions for their users at the moment of purchase.",
+    "API-first food intelligence platform that helps commerce and delivery apps give users personalized, safer food decisions at the moment of purchase.",
   generator: "v0.app",
   icons: {
-    icon: "/favicon.svg",
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-icon.png",
   },
 }
 

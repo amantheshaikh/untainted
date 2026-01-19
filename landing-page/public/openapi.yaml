@@ -4,25 +4,53 @@ info:
   version: 1.0.0
   description: |
     # Getting Started
-    Welcome to the Untainted API. This API provides a robust **food intelligence layer** for platforms, enabling quick-commerce, grocery, and health apps to deliver personalized safety checks for millions of users.
-
-    The API is designed to be simple to use, with predictable resource-oriented URLs and standard HTTP response codes.
-
-    ## Authentication
-    Include your API key in the `x-api-key` header.
     
+    Untainted is an intelligent "Food Safety as a Service" platform. We help B2B platforms—like grocery apps, health coaches, and q-commerce delivery services—automatically check if a food product is safe for a specific user based on their unique diet, allergies, and health goals.
+
+    Think of us as a specialized search engine: you give us a **product** and a **user profile**, and we tell you if they are compatible.
+
+    ---
+
+    ## Authentication & Environments
+    
+    The Untainted API uses API keys to authenticate requests. You can view and manage your API keys in the [Untainted Dashboard](https://untainted.io/dashboard).
+
+    We provide two environments:
+    
+    | Environment | Base URL | Key Prefix | Purpose |
+    | :--- | :--- | :--- | :--- |
+    | **Production** | `https://api.untainted.io` | `sk_live_...` | Real requests. Logs are permanent. Billable. |
+    | **Sandbox** | `https://api.untainted.io` | `sk_test_...` | Testing and development. Mock data may be used. logic is identical to prod. |
+
+    **To authenticate**, include your key in the `x-api-key` header of every request:
+
     ```bash
-    curl -H "x-api-key: sk_live_..." https://api.untainted.io/analyze
+    curl -H "x-api-key: sk_live_123456" https://api.untainted.io/healthz
     ```
+
+    ---
+
+    ## Core Concepts
+
+    ### 1. Analysis (`/analyze`)
+    This is the heart of the platform. You provide:
+    *   **Product Data**: Ingredients list, and optionally nutrition facts.
+    *   **User Profile**: A unique User ID (we fetch their profile from your secure database) OR a raw set of preferences (vegan, peanut allergy, etc.).
     
-    ## Core Endpoint: /analyze
-    The `/analyze` endpoint is the primary entry point.
-    
-    **Workflow:**
-    1. **Client** sends `barcode` (and optional `image`) + `customer_uid`.
-    2. **Untainted** resolves the product (DB/OpenFoodFacts) or falls back to OCR.
-    3. **Untainted** fetches the customer profile from Supabase.
-    4. **Analysis** runs and returns a clear `status` and verdict.
+    We return a **Verdict**: `SAFE`, `CAUTION`, or `NOT_SAFE`, along with detailed reasons why (e.g., "Contains Whey Protein which conflicts with Vegan Diet").
+
+    ### 2. Product Lookup (`/product/lookup`)
+    Before you can analyze a product, you often need its details. 
+    *   Send us a barcode (GTIN/UPC).
+    *   We check our database (and partners like OpenFoodFacts).
+    *   If found, we return the product's name, image, and ingredients.
+    *   If *not* found, you can use our `/product/missing` endpoint to submit it, or use our **Extraction** tools to read the label from a photo.
+
+    ### 3. Extraction Checks (`/extract/...`)
+    Don't have digital data for a product? No problem.
+    *   Take a photo of the back of the package (ingredients or nutrition label).
+    *   Send the image to us.
+    *   Our AI (Vision Language Model) will read the text and convert it into structured JSON for you.
 
   contact:
     name: Untainted Support
@@ -49,7 +77,7 @@ components:
       properties:
         ingredients:
           type: string
-          description: Raw ingredient text (one or multiple lines) or pasted list
+          description: Raw ingredient text (e.g. "Milk, Sugar, Cocoa")
         preferences:
           type: object
           description: Optional user preferences, allergies or diet constraints
@@ -108,9 +136,9 @@ components:
       properties:
         barcode:
           type: string
-          description: GTIN / barcode string
+          description: GTIN / barcode string (e.g. "0123456789012")
 
-    Product:
+    ProductResponse:
       type: object
       properties:
         code:
@@ -163,16 +191,16 @@ components:
       properties:
         customer_uid:
           type: string
-          description: Customer Unique ID
+          description: The unique ID of your user. We use this to look up their health profile.
         ingredients_text:
           type: string
-          description: Standardized ingredient list text from platform storage
+          description: The full text of the ingredients list from the package.
         nutrition_info:
           type: object
-          description: JSON object of nutrition facts (e.g. {sugar_100g: 5})
+          description: "JSON object of nutrition facts (e.g. {sugar_100g: 5})"
         preferences:
           type: object
-          description: Optional override for profile preferences
+          description: (Optional) Override safe/avoid lists for this specific check.
         product_name:
           type: string
         product_image:
@@ -184,10 +212,13 @@ components:
         status:
           type: string
           enum: [safe, not_safe, caution, unknown]
+          description: The final verdict.
         verdict_title:
           type: string
+          description: Short, human-readable title (e.g. "Avoid")
         verdict_description:
           type: string
+          description: Detailed explanation (e.g. "Contains Peanuts")
         product_name:
           type: string
         product_image:
@@ -212,80 +243,45 @@ components:
           type: array
           items:
             type: string
-          description: List of base64 encoded strings or URLs
+          description: List of base64 encoded strings or URLs of the product images.
 
     ExtractIngredientsResponse:
       type: object
       properties:
         ingredients_text:
           type: string
+          description: The AI-transcribed ingredients text.
 
     ExtractNutritionResponse:
       type: object
       properties:
         nutrition_info:
           type: object
+          description: Structured nutrition data extracted from the image.
 
 security:
   - ApiKeyAuth: []
 
 tags:
-  - name: Extraction
-    description: AI-powered data extraction (Gemini VLM)
   - name: Analysis
-    description: Real-time safety analysis
+    description: Core safety checks
+  - name: Products
+    description: Barcode lookup and inventory
+  - name: Extraction
+    description: AI image-to-text tools
   - name: System
-    description: Health and system checks
+    description: Health and status
 
 paths:
-  /extract/ingredients:
-    post:
-      summary: Extract Ingredients via VLM
-      tags:
-        - Extraction
-      description: |
-        Upload product images (front/back/side). AI will identify the ingredient list and transcribe it.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExtractRequest'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExtractIngredientsResponse'
-
-  /extract/nutrition:
-    post:
-      summary: Extract Nutrition Facts via VLM
-      tags:
-        - Extraction
-      description: |
-        Upload product images. AI will identify the nutrition label and parse it into structured JSON.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExtractRequest'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExtractNutritionResponse'
-
   /analyze:
     post:
-      summary: Analyze Product Safety
+      summary: Check Product Safety
       tags:
         - Analysis
       description: |
-        Real-time safety check. Pass the stored product data (ingredients/nutrition) and the user ID.
-        We fetch the user profile and apply safety rules against the product data.
+        **The main event.** 
+        
+        Send us a user's ID and a product's ingredient list. We'll cross-reference them against our database of millions of ingredients, allergies, and synoynms (e.g. "Casein" = "Milk") to tell you if it's safe for that user.
       requestBody:
         required: true
         content:
@@ -302,11 +298,94 @@ paths:
         '400':
           description: Invalid Request (missing uid or text)
 
+  /product/lookup:
+    post:
+      summary: Lookup by Barcode
+      tags:
+        - Products
+      description: |
+        Check if Untainted knows about a product. Useful for scanning barcodes in a store.
+        Returns product metadata (name, image, ingredients) if found.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductLookupRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '404':
+          description: Product not found. (Try /product/missing or Extraction)
+
+  /product/missing:
+    post:
+      summary: Submit Missing Product
+      tags:
+        - Products
+      description: |
+        Help us grow the database. If a lookup fails, you can submit the product details here.
+        Data is queued for verification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductSubmissionRequest'
+      responses:
+        '201':
+          description: Submission accepted
+
+  /extract/ingredients:
+    post:
+      summary: Extract Ingredients (OCR)
+      tags:
+        - Extraction
+      description: |
+        Upload a photo of a product's back label. We'll use AI to read the ingredient list and return it as text.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtractRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractIngredientsResponse'
+
+  /extract/nutrition:
+    post:
+      summary: Extract Nutrition Facts (OCR)
+      tags:
+        - Extraction
+      description: |
+        Upload a photo of a nutrition label. We'll parse the table (Calories, Fat, Protein, etc.) into a clean JSON object.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtractRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractNutritionResponse'
+
   /healthz:
     get:
-      summary: Health check
+      summary: Health Check
       tags:
         - System
+      description: |
+        Simple ping to verify the API is online and responsive.
       responses:
         '200':
           description: OK
