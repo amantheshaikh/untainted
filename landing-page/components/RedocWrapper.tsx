@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Script from "next/script"
 import { Navbar } from "@/components/Navbar"
 import { Footer } from "@/components/Footer"
 
@@ -12,54 +13,36 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const loadRedoc = async () => {
-      try {
-        // Load Redoc script dynamically if not present
-        if (!document.getElementById("redoc-script")) {
-          const script = document.createElement("script")
-          script.id = "redoc-script"
-          script.src = "https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"
-          script.async = true
-          document.head.appendChild(script)
-
-          await new Promise((resolve, reject) => {
-            script.onload = resolve
-            script.onerror = () => reject(new Error("Failed to load Redoc script"))
-          })
-        } else if (!(window as any).Redoc) {
-            // Script exists but might not be ready, wait a bit
-             await new Promise((resolve) => setTimeout(resolve, 500))
-        }
-
-        if ((window as any).Redoc) {
-          (window as any).Redoc.init(
-            spec,
-            {
-              scrollYOffset: 64,
-              theme: {
-                colors: {
-                  primary: {
-                    main: "#D65D26",
-                  },
-                },
-                typography: {
-                  fontFamily: "var(--font-inter)",
-                  headings: {
-                    fontFamily: "var(--font-figtree)",
-                  },
-                },
+  const initRedoc = () => {
+    if ((window as any).Redoc && containerRef.current) {
+      (window as any).Redoc.init(
+        spec,
+        {
+          scrollYOffset: 64,
+          theme: {
+            colors: {
+              primary: {
+                main: "#D65D26",
               },
             },
-            containerRef.current
-          )
-        }
-      } catch (err) {
-        setError(String(err))
-      }
+            typography: {
+              fontFamily: "var(--font-inter)",
+              headings: {
+                fontFamily: "var(--font-figtree)",
+              },
+            },
+          },
+        },
+        containerRef.current
+      )
     }
+  }
 
-    loadRedoc()
+  useEffect(() => {
+      // If script is already loaded (e.g. navigation between pages), init manually
+      if ((window as any).Redoc) {
+          initRedoc()
+      }
   }, [spec])
 
   return (
@@ -87,6 +70,12 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
           </div>
         </div>
       </main>
+      <Script 
+        src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"
+        strategy="lazyOnload"
+        onLoad={initRedoc}
+        onError={() => setError("Failed to load Redoc script")}
+      />
       <Footer />
     </>
   )
