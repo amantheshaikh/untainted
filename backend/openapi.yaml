@@ -166,6 +166,14 @@ components:
 security:
   - ApiKeyAuth: []
 
+tags:
+  - name: Analysis
+    description: Analysis, OCR and product lookup endpoints (hosted on Fly.io)
+  - name: Products
+    description: Product contribution and management
+  - name: System
+    description: Health and capability checks
+
 paths:
   /healthz:
     get:
@@ -203,7 +211,7 @@ paths:
       summary: Analyze ingredient list
       operationId: performCheck
       tags:
-         - Safety
+         - Analysis
       description: |
         Primary analysis endpoint. Accepts application/json or form-encoded data.
       requestBody:

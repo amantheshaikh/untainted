@@ -45,7 +45,7 @@ async function getApiNavigation() {
 
     // Fixed order for tags? Or just Object.entries
     // Let's define a priority order if we want, otherwise alphabetize or random
-    const preferredOrder = ["System", "Safety", "Products"]
+    const preferredOrder = ["Analysis", "Products", "System"]
     
     return Object.entries(groups)
         .sort(([a], [b]) => {

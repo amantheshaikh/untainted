@@ -6,10 +6,9 @@ import { cn } from "@/lib/utils"
 
 const sidebarItems = [
   {
-    title: "Getting Started",
+    title: "Overview",
     items: [
-      { title: "Introduction", href: "/docs" }, // or /docs/introduction
-      { title: "Authentication", href: "/docs/authentication" },
+      { title: "Introduction", href: "/docs" },
     ],
   },
 ]
@@ -83,13 +82,11 @@ export function DocsSidebar({ apiNavigation = [] }: DocsSidebarProps) {
 
         {/* Dynamic API Reference Section */}
         {apiNavigation.length > 0 && (
-           <div>
-             <h4 className="font-semibold text-foreground mb-3 px-2 text-sm uppercase tracking-wider">API Reference</h4>
-             <div className="space-y-6">
+           <div className="space-y-6 pt-2">
                {apiNavigation.map(section => (
                  <div key={section.title}>
-                    <h5 className="px-2 text-xs font-semibold text-muted-foreground mb-2 uppercase">{section.title}</h5>
-                    <ul className="space-y-1 border-l ml-2 pl-2 border-border">
+                    <h4 className="font-semibold text-foreground mb-3 px-2 text-sm uppercase tracking-wider">{section.title}</h4>
+                    <ul className="space-y-1">
                       {section.items.map(item => (
                         <li key={item.href}>
                           <Link
@@ -103,14 +100,6 @@ export function DocsSidebar({ apiNavigation = [] }: DocsSidebarProps) {
                     </ul>
                  </div>
                ))}
-               
-               {/* Fallback link to full spec */}
-               <div className="pt-2">
-                 <Link href="/docs/api-reference" className="block px-2 py-1.5 text-sm font-medium text-primary hover:underline">
-                    View Full Spec &rarr;
-                 </Link>
-               </div>
-             </div>
            </div>
         )}
       </div>
