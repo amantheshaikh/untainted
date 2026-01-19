@@ -40,7 +40,7 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
               theme: {
                 colors: {
                   primary: {
-                    main: "hsl(var(--primary))",
+                    main: "#D65D26",
                   },
                 },
                 typography: {
