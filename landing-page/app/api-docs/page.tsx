@@ -20,10 +20,11 @@ export default async function ApiDocsPage() {
     
     const specUrl = process.env.NEXT_PUBLIC_API_BASE 
         ? `${process.env.NEXT_PUBLIC_API_BASE.replace(/\/$/, "")}/openapi.yaml` 
-        : "http://localhost:8000/openapi.yaml"
+        : "https://untainted.fly.dev/openapi.yaml"
     
     // Fetch directly from backend to ensure we get the latest
-    const res = await fetch(specUrl, { next: { revalidate: 60 } })
+    // Added no-store to ensure we don't cache broken responses during dev/debugging
+    const res = await fetch(specUrl, { cache: "no-store" })
     if (!res.ok) {
         throw new Error(`Failed to fetch spec: ${res.status}`)
     }
