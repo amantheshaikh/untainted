@@ -170,6 +170,9 @@ paths:
   /healthz:
     get:
       summary: Health check
+      operationId: checkHealth
+      tags:
+        - System
       responses:
         '200':
           description: OK
@@ -184,6 +187,9 @@ paths:
   /capabilities:
     get:
       summary: Service capabilities / feature flags
+      operationId: getCapabilities
+      tags:
+        - System
       responses:
         '200':
           description: Capabilities
@@ -194,7 +200,10 @@ paths:
 
   /check:
     post:
-      summary: Analyze ingredient list and return verdict
+      summary: Analyze ingredient list
+      operationId: performCheck
+      tags:
+         - Safety
       description: |
         Primary analysis endpoint. Accepts application/json or form-encoded data.
       requestBody:
@@ -220,7 +229,10 @@ paths:
 
   /product/lookup:
     post:
-      summary: Lookup product by barcode / product code
+      summary: Lookup product
+      operationId: lookupProduct
+      tags:
+        - Products
       requestBody:
         required: true
         content:
@@ -239,7 +251,10 @@ paths:
 
   /product/missing:
     post:
-      summary: Submit details for a missing product
+      summary: Submit missing product
+      operationId: submitMissingProduct
+      tags:
+        - Products
       description: |
         Use this endpoint when a /product/lookup returns 404.
         Contributed data allows us to expand our dataset coverage.
@@ -266,7 +281,10 @@ paths:
 
   /ocr:
     post:
-      summary: OCR extraction from uploaded image
+      summary: OCR extraction
+      operationId: extractOCR
+      tags:
+        - Products
       requestBody:
         required: true
         content:
