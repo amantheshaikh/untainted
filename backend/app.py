@@ -371,6 +371,17 @@ async def check(request: Request) -> CheckResponse:
     return CheckResponse(**analysis)
 
 
+class AnalyzeResponse(BaseModel):
+    product_name: Optional[str] = None
+    product_image: Optional[str] = None
+    status: str
+    verdict_title: str
+    verdict_description: str
+    conflict_count: int
+    flagged_ingredients: List[str]
+    reasons: List[str]
+
+
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: Request) -> AnalyzeResponse:
     """Unified endpoint to analyze a product by barcode or image for a specific user."""
@@ -378,7 +389,6 @@ async def analyze(request: Request) -> AnalyzeResponse:
     _enforce_rate_limit(request)
 
     # 1. Parse Input
-    # We'll support JSON for now. Multipart handling can be added if needed for raw file uploads.
     try:
         data = await request.json()
     except Exception:
@@ -393,16 +403,8 @@ async def analyze(request: Request) -> AnalyzeResponse:
 
     # 2. Fetch User Profile
     profile_prefs = _fetch_profile_preferences(customer_uid)
-    if not profile_prefs:
-        # If no profile found, we can't do a personalized check.
-        # For MVP, maybe we allow a default? Or error?
-        # User said "pass the customer's UID... take the product and customers' profile info"
-        # Implies profile must exist.
-        pass # proceed with empty/default or error? Let's assume empty means no restrictions for now
-             # OR we could error. Let's log and proceed safe.
     
     final_prefs = profile_prefs or {}
-    # Merge overrides if any
     if data.get("preferences"):
         final_prefs.update(data.get("preferences"))
 
@@ -410,7 +412,6 @@ async def analyze(request: Request) -> AnalyzeResponse:
     ingredients_text = ""
     product_meta = {}
 
-    # Strategy A: Barcode
     if barcode:
         product = off_dataset_lookup(barcode)
         if product:
@@ -419,23 +420,14 @@ async def analyze(request: Request) -> AnalyzeResponse:
                  ingredients_text = ", ".join(ing_list)
              product_meta = product
 
-    # Strategy B: OCR (Fallback)
     if not ingredients_text and image_data:
-        # TODO: Real OCR implementation
-        # For now, we'll check if it's a base64 string and try to pass to tesseract if available
-        # or just use a placeholder if we can't easily decode.
-        # User asked to "detect if it has an image... and then process them"
-        # We will use the existing (stub or imported) extract check.
-        # See if server.py has extract_text_from_image. I added it to imports but need to check if it exists in server.py
-        # Wait, I didn't check server.py for `extract_text_from_image`. I only saw `ocr` endpoint placeholder.
-        # Let's verify server.py content in next step or assume I need to write it.
-        # For this step, I will stick to what I saw. I saw `ocr` endpoint returning mock.
-        # I'll implement a simple placeholder logic for now.
-        pass
+        # Use the newly added function from server.py (imported at top)
+        # Note: server.py needs to be importable.
+        ingredients_text = extract_text_from_image(image_data)
 
     if not ingredients_text:
         if barcode:
-            raise HTTPException(status_code=404, detail="Product not found and no image provided for fallback.")
+            raise HTTPException(status_code=404, detail="Product not found and no image provided.")
         elif image_data:
              raise HTTPException(status_code=422, detail="Could not extract text from image.")
         else:
@@ -445,22 +437,39 @@ async def analyze(request: Request) -> AnalyzeResponse:
     analysis = process_ingredients(ingredients_text, final_prefs)
     
     # 5. Format Response
-    # The user wants "let the platform know if the product is safe...".
-    # Analysis response has `status`, `reasons`, etc.
-    
-    # Map 'safe' | 'not_safe' | 'caution'
     status = analysis.get("status", "unknown")
+    hits = analysis.get("hits", [])
+    diet_hits = analysis.get("diet_hits", [])
+    allergy_hits = analysis.get("allergy_hits", [])
     
-    # Simple formatting
+    all_conflicts = list(set(hits + diet_hits + allergy_hits))
+    conflict_count = len(all_conflicts)
+    
+    verdict_title = "Safe to Consume"
+    verdict_desc = "No conflicts found with your profile."
+    
+    if status == "not_safe":
+        verdict_title = "Avoid"
+        if conflict_count == 1:
+             verdict_desc = f"Contains {all_conflicts[0]}."
+        else:
+             verdict_desc = f"Contains {conflict_count} conflicting ingredients."
+
+    reasons = []
+    if diet_hits:
+        reasons.append(f"Dietary conflicts: {', '.join(diet_hits)}")
+    if allergy_hits:
+        reasons.append(f"Allergen warnings: {', '.join(allergy_hits)}")
+    
     return AnalyzeResponse(
         product_name=product_meta.get("product_name") or product_meta.get("name"),
         product_image=product_meta.get("image_url"),
         status=status,
-        verdict_title="Safe to Consume" if status == "safe" else "Avoid",
-        verdict_description="No conflicts found." if status == "safe" else f"Conflicts with {len(analysis.get('reasons', []))} preferences.",
-        conflict_count=len(analysis.get("reasons", [])),
-        flagged_ingredients=analysis.get("flagged_ingredients", []),
-        reasons=analysis.get("reasons", [])
+        verdict_title=verdict_title,
+        verdict_description=verdict_desc,
+        conflict_count=conflict_count,
+        flagged_ingredients=all_conflicts,
+        reasons=reasons
     )
 
 
