@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import Link from "next/link"
 import { motion } from "framer-motion"
 
                           <Image
@@ -40,14 +41,14 @@ export const HeroSection = () => {
             </p>
 
             <div className="flex flex-wrap gap-4">
-              <button
-                onClick={() => router.push("/contact")}
+              <Link
+                href="/docs"
                 className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full text-base font-medium hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-md group"
               >
                 <Building2 className="w-4 h-4" />
                 Get API Access
                 <ArrowRight className="w-4 h-4 transition-transform duration-150 group-hover:translate-x-1" />
-              </button>
+              </Link>
             </div>
 
             <div className="grid grid-cols-3 gap-6 mt-12 pt-8 border-t border-border">

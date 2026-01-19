@@ -1,0 +1,418 @@
+export const openApiSpec = {
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Untainted API",
+    "version": "1.0.0",
+    "description": "# Getting Started\nWelcome to the Untainted API. This API provides a robust **food intelligence layer** for platforms, enabling quick-commerce, grocery, and health apps to deliver personalized safety checks for millions of users.\n\nThe API is designed to be simple to use, with predictable resource-oriented URLs and standard HTTP response codes.\n\n## Authentication\nInclude your API key in the `x-api-key` header.\n\n```bash\ncurl -H \"x-api-key: sk_live_...\" https://api.untainted.io/analyze\n```\n\n## Core Endpoint: /analyze\nThe `/analyze` endpoint is the primary entry point.\n\n**Workflow:**\n1. **Client** sends `barcode` (and optional `image`) + `customer_uid`.\n2. **Untainted** resolves the product (DB/OpenFoodFacts) or falls back to OCR.\n3. **Untainted** fetches the customer profile from Supabase.\n4. **Analysis** runs and returns a clear `status` and verdict.\n",
+    "contact": {
+      "name": "Untainted Support",
+      "url": "https://untainted.io/contact",
+      "email": "support@untainted.io"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.untainted.io",
+      "description": "Production API (Fly.io)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    },
+    "schemas": {
+      "CheckRequest": {
+        "type": "object",
+        "required": [
+          "ingredients"
+        ],
+        "properties": {
+          "ingredients": {
+            "type": "string",
+            "description": "Raw ingredient text (one or multiple lines) or pasted list"
+          },
+          "preferences": {
+            "type": "object",
+            "description": "Optional user preferences, allergies or diet constraints"
+          },
+          "customer_uid": {
+            "type": "string",
+            "description": "Optional UID of the customer to fetch profile from (overrides preferences)"
+          }
+        }
+      },
+      "Reason": {
+        "type": "object",
+        "properties": {
+          "ingredient": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "conflicts_with": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AnalysisResponse": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "string",
+            "nullable": true
+          },
+          "verdict": {
+            "type": "string",
+            "description": "SAFE | CAUTION | NOT_SAFE"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float",
+            "description": "0..1"
+          },
+          "flagged_ingredients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            }
+          },
+          "safe_alternatives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "processing_time_ms": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "raw": {
+            "type": "object",
+            "description": "Raw diagnostic payload (taxonomies, hits, etc.)"
+          }
+        }
+      },
+      "ProductLookupRequest": {
+        "type": "object",
+        "required": [
+          "barcode"
+        ],
+        "properties": {
+          "barcode": {
+            "type": "string",
+            "description": "GTIN / barcode string"
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "image_url": {
+            "type": "string"
+          },
+          "meta": {
+            "type": "object"
+          }
+        }
+      },
+      "ProductSubmissionRequest": {
+        "type": "object",
+        "required": [
+          "barcode"
+        ],
+        "properties": {
+          "barcode": {
+            "type": "string",
+            "description": "GTIN / barcode string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string"
+          },
+          "ingredients_text": {
+            "type": "string"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "image_url": {
+            "type": "string"
+          }
+        }
+      },
+      "OCRResponse": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          }
+        }
+      },
+      "AnalyzeRequest": {
+        "type": "object",
+        "required": [
+          "customer_uid",
+          "ingredients_text"
+        ],
+        "properties": {
+          "customer_uid": {
+            "type": "string",
+            "description": "Customer Unique ID"
+          },
+          "ingredients_text": {
+            "type": "string",
+            "description": "Standardized ingredient list text from platform storage"
+          },
+          "nutrition_info": {
+            "type": "object",
+            "description": "JSON object of nutrition facts (e.g. {sugar_100g: 5})"
+          },
+          "preferences": {
+            "type": "object",
+            "description": "Optional override for profile preferences"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "product_image": {
+            "type": "string"
+          }
+        }
+      },
+      "AnalyzeResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "safe",
+              "not_safe",
+              "caution",
+              "unknown"
+            ]
+          },
+          "verdict_title": {
+            "type": "string"
+          },
+          "verdict_description": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "product_image": {
+            "type": "string"
+          },
+          "conflict_count": {
+            "type": "integer"
+          },
+          "flagged_ingredients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ExtractRequest": {
+        "type": "object",
+        "required": [
+          "images"
+        ],
+        "properties": {
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of base64 encoded strings or URLs"
+          }
+        }
+      },
+      "ExtractIngredientsResponse": {
+        "type": "object",
+        "properties": {
+          "ingredients_text": {
+            "type": "string"
+          }
+        }
+      },
+      "ExtractNutritionResponse": {
+        "type": "object",
+        "properties": {
+          "nutrition_info": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Extraction",
+      "description": "AI-powered data extraction (Gemini VLM)"
+    },
+    {
+      "name": "Analysis",
+      "description": "Real-time safety analysis"
+    },
+    {
+      "name": "System",
+      "description": "Health and system checks"
+    }
+  ],
+  "paths": {
+    "/extract/ingredients": {
+      "post": {
+        "summary": "Extract Ingredients via VLM",
+        "tags": [
+          "Extraction"
+        ],
+        "description": "Upload product images (front/back/side). AI will identify the ingredient list and transcribe it.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractIngredientsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/extract/nutrition": {
+      "post": {
+        "summary": "Extract Nutrition Facts via VLM",
+        "tags": [
+          "Extraction"
+        ],
+        "description": "Upload product images. AI will identify the nutrition label and parse it into structured JSON.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractNutritionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analyze": {
+      "post": {
+        "summary": "Analyze Product Safety",
+        "tags": [
+          "Analysis"
+        ],
+        "description": "Real-time safety check. Pass the stored product data (ingredients/nutrition) and the user ID.\nWe fetch the user profile and apply safety rules against the product data.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Safety Verdict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Request (missing uid or text)"
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "summary": "Health check",
+        "tags": [
+          "System"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  }
+}
