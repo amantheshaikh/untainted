@@ -1,6 +1,16 @@
 "use client"
 
+import Image from "next/image"
 import { motion } from "framer-motion"
+
+                          <Image
+                            src="/granola-bar-healthy-snack.jpg"
+                            alt="Muesli"
+                            width={128}
+                            height={128}
+                            priority
+                            className="w-full h-full object-cover rounded-lg"
+                          />
 import { ArrowRight, Building2, Code2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 

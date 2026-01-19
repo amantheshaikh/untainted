@@ -1,5 +1,7 @@
 "use client"
 
+import Image from "next/image"
+
 import { Github, Twitter, Linkedin, Mail, Apple, Smartphone } from "lucide-react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
@@ -121,7 +123,7 @@ export const Footer = () => {
             className="col-span-2"
           >
             <div className="mb-4">
-              <img src="/images/full-20logo.png" alt="Untainted" className="h-8 mb-4" />
+              <Image src="/images/full-20logo.png" alt="Untainted" width={140} height={32} className="h-8 mb-4 w-auto" />
               <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
                 Know what&apos;s really in your food. Create your profile once, use it everywhere you shop.
               </p>

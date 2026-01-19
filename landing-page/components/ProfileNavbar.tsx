@@ -1,5 +1,7 @@
 "use client"
 
+import Image from "next/image"
+
 import { useRouter } from "next/navigation"
 import { supabase } from "../lib/supabaseClient"
 import { Button } from "./ui/button"
@@ -22,7 +24,7 @@ export const ProfileNavbar = () => {
               onClick={() => router.push("/")}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-200"
             >
-              <img src="/images/full-20logo.png" alt="Untainted" className="h-8" />
+              <Image src="/images/full-20logo.png" alt="Untainted" width={140} height={32} className="h-8 w-auto" />
             </button>
           </div>
 
