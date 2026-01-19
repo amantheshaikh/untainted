@@ -15,6 +15,9 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
 
   const initRedoc = () => {
     if ((window as any).Redoc && containerRef.current) {
+      // Clear existing redoc instance to prevent "removeChild" errors during strict mode/re-renders
+      containerRef.current.innerHTML = "";
+      
       (window as any).Redoc.init(
         spec,
         {
@@ -23,6 +26,7 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
           expandResponses: "200,201",
           requiredPropsFirst: true,
           nativeScrollbars: true,
+          disableDeepLinks: true,
           theme: {
             colors: {
               primary: {
@@ -48,11 +52,44 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
           initRedoc()
       }
   }, [spec])
+  
+  useEffect(() => {
+    // Intercept history.replaceState/pushState to prevent Redoc from polluting the URL with hashes
+    // even if disableDeepLinks is set (as a failsafe).
+    const originalPushState = history.pushState
+    const originalReplaceState = history.replaceState
+
+    const allowUrlChange = (url: string | URL | null | undefined): boolean => {
+       if (!url) return true
+       const urlStr = url.toString()
+       // Block Redoc tags/paths
+       if (urlStr.includes("#tag") || urlStr.includes("#operation") || urlStr.includes("#model")) {
+           return false
+       }
+       return true
+    }
+
+    history.pushState = function(...args) {
+      if (allowUrlChange(args[2])) {
+        return originalPushState.apply(this, args)
+      }
+    }
+
+    history.replaceState = function(...args) {
+      if (allowUrlChange(args[2])) {
+        return originalReplaceState.apply(this, args)
+      }
+    }
+
+    return () => {
+      history.pushState = originalPushState
+      history.replaceState = originalReplaceState
+    }
+  }, [])
 
   return (
     <>
-      <Navbar />
-      <main className="min-h-screen bg-background pt-16 pb-0">
+      <main className="min-h-screen bg-background pt-0 pb-0">
         <div className="w-full">
           <div className="bg-card border-t border-border shadow-sm overflow-hidden" role="main" aria-label="API Documentation Content">
              {error ? (
@@ -69,7 +106,6 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
         onLoad={initRedoc}
         onError={() => setError("Failed to load Redoc script")}
       />
-      <Footer />
     </>
   )
 }
