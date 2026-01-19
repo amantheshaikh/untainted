@@ -13,6 +13,7 @@ const navigationLinks = [
   { name: "For Business", href: "#for-business" },
   { name: "For Personal", href: "#for-personal" },
   { name: "How It Works", href: "#how-it-works" },
+  { name: "Documentation", href: "/docs" },
   { name: "Pricing", href: "#pricing" },
 ]
 
