@@ -158,7 +158,7 @@ export const Navbar = () => {
                 </Link>
 
                 <Link
-                  href="/signup?type=personal"
+                  href="/signup"
                   className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-base font-medium hover:opacity-90 transition-all duration-200 shadow-sm"
                 >
                   Sign Up
