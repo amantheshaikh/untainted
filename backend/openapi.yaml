@@ -9,38 +9,20 @@ info:
     The API is designed to be simple to use, with predictable resource-oriented URLs and standard HTTP response codes.
 
     ## Authentication
-    This API uses API keys to authenticate requests. You can view and manage your API keys in the [Untainted Dashboard](https://untainted.io/dashboard).
-
-    Authentication to the API is performed via HTTP Header. Provide your API key as the value for the `x-api-key` header.
-
+    Include your API key in the `x-api-key` header.
+    
     ```bash
-    curl -H "x-api-key: sk_live_..." https://api.untainted.io/check
+    curl -H "x-api-key: sk_live_..." https://api.untainted.io/analyze
     ```
-
-    > **Security Note:** Your API keys carry many privileges, so be sure to keep them secure! Do not share your secret API keys in publicly accessible areas such as GitHub, client-side code, etc.
-
-    ### Key Variants
-    Keys come in two variants:
-    - **Live (`sk_live_...`)**: Production environment. Hits are billed and affect actual data.
-    - **Test (`sk_test_...`)**: Sandbox environment. Use these for development and testing integration without affecting production stats.
-
-    ## Core Concepts
-
-    ### Safety Checks
-    The `/check` endpoint is the heart of Untainted. It determines if a product is "safe" or "not_safe" for a specific customer based on their unique profile (diets, allergies, health goals).
-
-    **Workflow:**
-    1.  **Identify**: You send a product's ingredient list (OCR'd or from database).
-    2.  **Contextualize**: You provide the customer's specific profile (passed as preferences object or via `customer_uid`).
-    3.  **Decide**: We return a binary `status` ("safe" | "not_safe") along with detailed categories and conflict explanations.
-
-    ### Product Contribution
-    We maintain a comprehensive database, but the food world is vast. We encourage partners to contribute missing data.
+    
+    ## Core Endpoint: /analyze
+    The `/analyze` endpoint is the primary entry point.
     
     **Workflow:**
-    1.  Call `/product/lookup`.
-    2.  If `404`, call `/product/missing` to submit the data.
-    3.  We validate and merge it into the master dataset.
+    1. **Client** sends `barcode` (and optional `image`) + `customer_uid`.
+    2. **Untainted** resolves the product (DB/OpenFoodFacts) or falls back to OCR.
+    3. **Untainted** fetches the customer profile from Supabase.
+    4. **Analysis** runs and returns a clear `status` and verdict.
 
   contact:
     name: Untainted Support
@@ -173,6 +155,49 @@ components:
         confidence:
           type: number
 
+    AnalyzeRequest:
+      type: object
+      required:
+        - customer_uid
+      properties:
+        barcode:
+          type: string
+          description: Product barcode/GTIN
+        image:
+          type: string
+          description: Base64 string or URL
+        customer_uid:
+          type: string
+          description: Customer Unique ID
+        preferences:
+          type: object
+          description: Optional override for profile preferences
+
+    AnalyzeResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [safe, not_safe, caution, unknown]
+        verdict_title:
+          type: string
+        verdict_description:
+          type: string
+        product_name:
+          type: string
+        product_image:
+          type: string
+        conflict_count:
+          type: integer
+        flagged_ingredients:
+          type: array
+          items:
+            type: string
+        reasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reason'
+
 security:
   - ApiKeyAuth: []
 
@@ -185,6 +210,33 @@ tags:
     description: Health and capability checks
 
 paths:
+  /analyze:
+    post:
+      summary: Analyze product safety
+      operationId: analyzeProduct
+      tags:
+        - Analysis
+      description: |
+        Unified endpoint. Pass a barcode and/or image, plus the customer_uid.
+        We handle lookup, OCR, and profile checking.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+      responses:
+        '200':
+          description: Safety Verdict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeResponse'
+        '400':
+          description: Invalid Request (missing uid, etc.)
+        '404':
+          description: Product not found (and no image for OCR)
+
   /healthz:
     get:
       summary: Health check
@@ -194,134 +246,7 @@ paths:
       responses:
         '200':
           description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
 
-  /capabilities:
-    get:
-      summary: Service capabilities / feature flags
-      operationId: getCapabilities
-      tags:
-        - System
-      responses:
-        '200':
-          description: Capabilities
-          content:
-            application/json:
-              schema:
-                type: object
-
-  /check:
-    post:
-      summary: Analyze ingredient list
-      operationId: performCheck
-      tags:
-         - Analysis
-      description: |
-        Primary analysis endpoint. Accepts application/json or form-encoded data.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CheckRequest'
-      responses:
-        '200':
-          description: Analysis result
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AnalysisResponse'
-        '400':
-          description: Bad request
-        '500':
-          description: Internal error
-
-  /product/lookup:
-    post:
-      summary: Lookup product
-      operationId: lookupProduct
-      tags:
-        - Products
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProductLookupRequest'
-      responses:
-        '200':
-          description: Product found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Product'
-        '404':
-          description: Product not found
-
-  /product/missing:
-    post:
-      summary: Submit missing product
-      operationId: submitMissingProduct
-      tags:
-        - Products
-      description: |
-        Use this endpoint when a /product/lookup returns 404.
-        Contributed data allows us to expand our dataset coverage.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProductSubmissionRequest'
-      responses:
-        '201':
-          description: Submission accepted and queued
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                  message:
-                    type: string
-        '400':
-          description: Invalid data (missing barcode)
-
-  /ocr:
-    post:
-      summary: OCR extraction
-      operationId: extractOCR
-      tags:
-        - Products
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
-      responses:
-        '200':
-          description: OCR result
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OCRResponse'
-        '400':
-          description: Invalid upload
 
 
 
