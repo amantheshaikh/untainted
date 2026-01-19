@@ -20,7 +20,7 @@ export default async function ApiDocsPage() {
     
     const specUrl = process.env.NEXT_PUBLIC_API_BASE 
         ? `${process.env.NEXT_PUBLIC_API_BASE.replace(/\/$/, "")}/openapi.yaml` 
-        : "https://untainted.fly.dev/openapi.yaml"
+        : "https://api.untainted.io/openapi.yaml"
     
     // Fetch directly from backend to ensure we get the latest
     // Added no-store to ensure we don't cache broken responses during dev/debugging
