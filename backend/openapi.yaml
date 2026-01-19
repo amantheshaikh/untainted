@@ -3,39 +3,49 @@ info:
   title: Untainted API
   version: 1.0.0
   description: |
-    Untainted provides a robust **food intelligence layer** for platforms.
-    Our API enables quick-commerce, grocery, and health apps to deliver personalized safety checks for millions of users.
+    # Getting Started
+    Welcome to the Untainted API. This API provides a robust **food intelligence layer** for platforms, enabling quick-commerce, grocery, and health apps to deliver personalized safety checks for millions of users.
+
+    The API is designed to be simple to use, with predictable resource-oriented URLs and standard HTTP response codes.
 
     ## Authentication
-    This API requires an API key for all secure endpoints.
-    Include your key in the `x-api-key` header of your request.
-    
-    Keys come in two variants:
-    - **Live (`sk_live_...`)**: Production environment. Hits are billed and affect production data.
-    - **Test (`sk_test_...`)**: Sandbox environment. Use these for development and testing integration.
+    This API uses API keys to authenticate requests. You can view and manage your API keys in the [Untainted Dashboard](https://untainted.io/dashboard).
 
-    ## Core Capability: Safety Checks
-    The `/check` endpoint is the heart of the Untainted stack. It determines if a product is "safe" or "not_safe" for a specific customer based on their unique profile (diets, allergies, health goals).
+    Authentication to the API is performed via HTTP Header. Provide your API key as the value for the `x-api-key` header.
+
+    ```bash
+    curl -H "x-api-key: sk_live_..." https://api.untainted.io/check
+    ```
+
+    > **Security Note:** Your API keys carry many privileges, so be sure to keep them secure! Do not share your secret API keys in publicly accessible areas such as GitHub, client-side code, etc.
+
+    ### Key Variants
+    Keys come in two variants:
+    - **Live (`sk_live_...`)**: Production environment. Hits are billed and affect actual data.
+    - **Test (`sk_test_...`)**: Sandbox environment. Use these for development and testing integration without affecting production stats.
+
+    ## Core Concepts
+
+    ### Safety Checks
+    The `/check` endpoint is the heart of Untainted. It determines if a product is "safe" or "not_safe" for a specific customer based on their unique profile (diets, allergies, health goals).
 
     **Workflow:**
-    1.  **Identify**: Analyze a product's ingredient list.
-    2.  **Contextualize**: Apply the customer's specific profile (passed as preferences or via UID).
-    3.  **Decide**: Receive a binary `status` ("safe" | "not_safe") along with detailed conflict reasoning.
+    1.  **Identify**: You send a product's ingredient list (OCR'd or from database).
+    2.  **Contextualize**: You provide the customer's specific profile (passed as preferences object or via `customer_uid`).
+    3.  **Decide**: We return a binary `status` ("safe" | "not_safe") along with detailed categories and conflict explanations.
 
-    ## Product Contribution
-    Untainted maintains a comprehensive database of food products.
-    We encourage partners to contribute missing data to expand the shared intelligence network.
-
-    **Submission Workflow:**
-    1.  **Lookup**: Call `/product/lookup` with a barcode.
-    2.  **Not Found**: If you receive a `404 Not Found`, proceed to step 3.
-    3.  **Submit**: Call `/product/missing` (POST) with the barcode and details.
+    ### Product Contribution
+    We maintain a comprehensive database, but the food world is vast. We encourage partners to contribute missing data.
     
-    Data submitted is validated before merging into the master dataset.
+    **Workflow:**
+    1.  Call `/product/lookup`.
+    2.  If `404`, call `/product/missing` to submit the data.
+    3.  We validate and merge it into the master dataset.
 
   contact:
-    name: Untainted
-    url: https://untainted.io
+    name: Untainted Support
+    url: https://untainted.io/contact
+    email: support@untainted.io
 
 servers:
   - url: https://api.untainted.io

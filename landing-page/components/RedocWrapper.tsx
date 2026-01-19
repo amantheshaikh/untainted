@@ -19,6 +19,10 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
         spec,
         {
           scrollYOffset: 64,
+          hideDownloadButton: true,
+          expandResponses: "200,201",
+          requiredPropsFirst: true,
+          nativeScrollbars: true,
           theme: {
             colors: {
               primary: {
@@ -48,20 +52,9 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-background pt-24 pb-12">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">API Documentation</h1>
-            <p className="text-muted-foreground mt-2">
-              Complete reference for the Untainted API. For access keys, please{" "}
-              <a href="/contact" className="text-primary hover:underline">
-                contact sales
-              </a>
-              .
-            </p>
-          </div>
-          
-          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden" role="main" aria-label="API Documentation Content">
+      <main className="min-h-screen bg-background pt-16 pb-0">
+        <div className="w-full">
+          <div className="bg-card border-t border-border shadow-sm overflow-hidden" role="main" aria-label="API Documentation Content">
              {error ? (
                 <div className="p-4 text-destructive">Failed to load API docs: {error}</div>
              ) : (
