@@ -84,6 +84,11 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
     return () => {
       history.pushState = originalPushState
       history.replaceState = originalReplaceState
+      
+      // Destroy Redoc instance to remove global event listeners (hashchange, scroll)
+      if ((window as any).Redoc && typeof (window as any).Redoc.destroy === 'function') {
+        (window as any).Redoc.destroy();
+      }
     }
   }, [])
 
