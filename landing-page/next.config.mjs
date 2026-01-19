@@ -10,7 +10,6 @@ const nextConfig = {
     optimizePackageImports: ["lucide-react", "framer-motion"],
   },
   images: {
-    unoptimized: true,
   },
 }
 
