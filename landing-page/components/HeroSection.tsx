@@ -99,9 +99,11 @@ export const HeroSection = () => {
                     <div className="bg-card rounded-xl border border-border p-3">
                       <div className="flex gap-3">
                         <div className="w-16 h-16 bg-secondary rounded-lg flex items-center justify-center">
-                          <img
+                          <Image
                             src="/granola-bar-healthy-snack.jpg"
                             alt="Muesli"
+                            width={64}
+                            height={64}
                             className="w-full h-full object-cover rounded-lg"
                           />
                         </div>
