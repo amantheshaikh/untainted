@@ -33,7 +33,7 @@ jobs:
 
       - name: Build Docker image (sanity)
         run: |
-          docker build -t untainted-backend ./backend
+          docker build -t untainted-backend -f backend/Dockerfile .
 
   deploy:
     name: Deploy to Fly
