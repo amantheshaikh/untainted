@@ -382,61 +382,109 @@ class AnalyzeResponse(BaseModel):
     reasons: List[str]
 
 
+from .vlm import extract_ingredients_with_gemini, extract_nutrition_with_gemini
+
+class ExtractRequest(BaseModel):
+    images: List[str] = Field(..., description="List of base64 encoded images")
+
+class ExtractIngredientsResponse(BaseModel):
+    ingredients_text: str
+
+class ExtractNutritionResponse(BaseModel):
+    nutrition_info: Dict[str, Any]
+
+@app.post("/extract/ingredients", response_model=ExtractIngredientsResponse)
+async def extract_ingredients_endpoint(payload: ExtractRequest, request: Request) -> ExtractIngredientsResponse:
+    """Use Gemini VLM to extract ingredients text from images."""
+    _require_api_key(request)
+    _enforce_rate_limit(request)
+    
+    # Prepare images for Gemini
+    # payload.images are base64 strings
+    image_parts = []
+    for b64 in payload.images:
+        # minimal cleanup if data URI
+        clean_b64 = b64
+        if "," in clean_b64:
+            clean_b64 = clean_b64.split(",", 1)[1]
+        try:
+            image_parts.append({
+                "mime_type": "image/jpeg", # defaulting to jpeg for simplicity
+                "data": base64.b64decode(clean_b64)
+            })
+        except Exception:
+            continue
+            
+    if not image_parts:
+         raise HTTPException(status_code=400, detail="No valid images provided")
+
+    text = extract_ingredients_with_gemini(image_parts)
+    return ExtractIngredientsResponse(ingredients_text=text)
+
+@app.post("/extract/nutrition", response_model=ExtractNutritionResponse)
+async def extract_nutrition_endpoint(payload: ExtractRequest, request: Request) -> ExtractNutritionResponse:
+    """Use Gemini VLM to extract structured nutrition info from images."""
+    _require_api_key(request)
+    _enforce_rate_limit(request)
+    
+    image_parts = []
+    for b64 in payload.images:
+        clean_b64 = b64
+        if "," in clean_b64:
+             clean_b64 = clean_b64.split(",", 1)[1]
+        try:
+             image_parts.append({
+                 "mime_type": "image/jpeg",
+                 "data": base64.b64decode(clean_b64)
+             })
+        except Exception:
+             continue
+             
+    if not image_parts:
+         raise HTTPException(status_code=400, detail="No valid images provided")
+
+    data = extract_nutrition_with_gemini(image_parts)
+    return ExtractNutritionResponse(nutrition_info=data)
+
+
+class AnalyzePayload(BaseModel):
+    customer_uid: str
+    ingredients_text: str
+    nutrition_info: Optional[Dict[str, Any]] = None
+    preferences: Optional[Dict[str, Any]] = None
+    # Optional metadata for response
+    product_name: Optional[str] = None
+    product_image: Optional[str] = None
+
+
 @app.post("/analyze", response_model=AnalyzeResponse)
-async def analyze(request: Request) -> AnalyzeResponse:
-    """Unified endpoint to analyze a product by barcode or image for a specific user."""
+async def analyze(payload: AnalyzePayload, request: Request) -> AnalyzeResponse:
+    """
+    Pure analysis endpoint. 
+    Accepts pre-extracted ingredients/nutrition and customer UID.
+    Returns safety verdict.
+    """
     _require_api_key(request)
     _enforce_rate_limit(request)
 
-    # 1. Parse Input
-    try:
-        data = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-    barcode = data.get("barcode")
-    image_data = data.get("image")
-    customer_uid = data.get("customer_uid")
-    
-    if not customer_uid:
-        raise HTTPException(status_code=400, detail="customer_uid is required")
-
-    # 2. Fetch User Profile
-    profile_prefs = _fetch_profile_preferences(customer_uid)
-    
+    # 1. Fetch User Profile
+    profile_prefs = _fetch_profile_preferences(payload.customer_uid)
     final_prefs = profile_prefs or {}
-    if data.get("preferences"):
-        final_prefs.update(data.get("preferences"))
+    if payload.preferences:
+        final_prefs.update(payload.preferences)
 
-    # 3. Resolve Ingredients
-    ingredients_text = ""
+    # 2. Process Ingredients
+    # We pass the nutrition info into product_meta if available so process_ingredients can try to use it
+    # (Though currently process_ingredients logic specifically for nutrition is limited, we passed it in `product_meta` before)
     product_meta = {}
+    if payload.nutrition_info:
+        # Map snake_case keys to what process_ingredients expects if needed
+        # process_ingredients looks for "nutriments" dict
+        product_meta["nutriments"] = payload.nutrition_info
+        
+    analysis = process_ingredients(payload.ingredients_text, final_prefs, product_meta=product_meta)
 
-    if barcode:
-        product = off_dataset_lookup(barcode)
-        if product:
-             _, name, ing_list = _extract_product_fields(product)
-             if ing_list:
-                 ingredients_text = ", ".join(ing_list)
-             product_meta = product
-
-    if not ingredients_text and image_data:
-        # Use the newly added function from server.py (imported at top)
-        # Note: server.py needs to be importable.
-        ingredients_text = extract_text_from_image(image_data)
-
-    if not ingredients_text:
-        if barcode:
-            raise HTTPException(status_code=404, detail="Product not found and no image provided.")
-        elif image_data:
-             raise HTTPException(status_code=422, detail="Could not extract text from image.")
-        else:
-             raise HTTPException(status_code=400, detail="Must provide barcode or image.")
-
-    # 4. Process
-    analysis = process_ingredients(ingredients_text, final_prefs)
-    
-    # 5. Format Response
+    # 3. Format Response
     status = analysis.get("status", "unknown")
     hits = analysis.get("hits", [])
     diet_hits = analysis.get("diet_hits", [])
@@ -462,8 +510,8 @@ async def analyze(request: Request) -> AnalyzeResponse:
         reasons.append(f"Allergen warnings: {', '.join(allergy_hits)}")
     
     return AnalyzeResponse(
-        product_name=product_meta.get("product_name") or product_meta.get("name"),
-        product_image=product_meta.get("image_url"),
+        product_name=payload.product_name,
+        product_image=payload.product_image,
         status=status,
         verdict_title=verdict_title,
         verdict_description=verdict_desc,

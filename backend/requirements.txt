@@ -9,3 +9,4 @@ requests
 openfoodfacts
 python-multipart
 supabase
+google-generativeai

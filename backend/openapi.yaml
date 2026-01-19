@@ -159,19 +159,24 @@ components:
       type: object
       required:
         - customer_uid
+        - ingredients_text
       properties:
-        barcode:
-          type: string
-          description: Product barcode/GTIN
-        image:
-          type: string
-          description: Base64 string or URL
         customer_uid:
           type: string
           description: Customer Unique ID
+        ingredients_text:
+          type: string
+          description: Standardized ingredient list text from platform storage
+        nutrition_info:
+          type: object
+          description: JSON object of nutrition facts (e.g. {sugar_100g: 5})
         preferences:
           type: object
           description: Optional override for profile preferences
+        product_name:
+          type: string
+        product_image:
+          type: string
 
     AnalyzeResponse:
       type: object
@@ -196,29 +201,91 @@ components:
         reasons:
           type: array
           items:
-            $ref: '#/components/schemas/Reason'
+            type: string
+
+    ExtractRequest:
+      type: object
+      required:
+        - images
+      properties:
+        images:
+          type: array
+          items:
+            type: string
+          description: List of base64 encoded strings or URLs
+
+    ExtractIngredientsResponse:
+      type: object
+      properties:
+        ingredients_text:
+          type: string
+
+    ExtractNutritionResponse:
+      type: object
+      properties:
+        nutrition_info:
+          type: object
 
 security:
   - ApiKeyAuth: []
 
 tags:
+  - name: Extraction
+    description: AI-powered data extraction (Gemini VLM)
   - name: Analysis
-    description: Analysis, OCR and product lookup endpoints (hosted on Fly.io)
-  - name: Products
-    description: Product contribution and management
+    description: Real-time safety analysis
   - name: System
-    description: Health and capability checks
+    description: Health and system checks
 
 paths:
+  /extract/ingredients:
+    post:
+      summary: Extract Ingredients via VLM
+      tags:
+        - Extraction
+      description: |
+        Upload product images (front/back/side). AI will identify the ingredient list and transcribe it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtractRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractIngredientsResponse'
+
+  /extract/nutrition:
+    post:
+      summary: Extract Nutrition Facts via VLM
+      tags:
+        - Extraction
+      description: |
+        Upload product images. AI will identify the nutrition label and parse it into structured JSON.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtractRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractNutritionResponse'
+
   /analyze:
     post:
-      summary: Analyze product safety
-      operationId: analyzeProduct
+      summary: Analyze Product Safety
       tags:
         - Analysis
       description: |
-        Unified endpoint. Pass a barcode and/or image, plus the customer_uid.
-        We handle lookup, OCR, and profile checking.
+        Real-time safety check. Pass the stored product data (ingredients/nutrition) and the user ID.
+        We fetch the user profile and apply safety rules against the product data.
       requestBody:
         required: true
         content:
@@ -233,14 +300,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/AnalyzeResponse'
         '400':
-          description: Invalid Request (missing uid, etc.)
-        '404':
-          description: Product not found (and no image for OCR)
+          description: Invalid Request (missing uid or text)
 
   /healthz:
     get:
       summary: Health check
-      operationId: checkHealth
       tags:
         - System
       responses:
