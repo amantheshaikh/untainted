@@ -2355,6 +2355,58 @@ def preprocess_image_opencv(image_bytes: bytes, max_dim: int = 1600) -> Image.Im
     return Image.fromarray(gray)
 
 
+def extract_text_from_image(image_input: str) -> str:
+    """
+    Extract text from a base64 encoded image string or URL.
+    """
+    if not image_input:
+        return ""
+        
+    try:
+        # Check if it's a URL (simple check)
+        if image_input.startswith("http") or image_input.startswith("https"):
+            # TODO: Implement URL fetching if needed
+            return ""
+        
+        # Assume base64
+        # Remove header if present (e.g. data:image/jpeg;base64,...)
+        if "," in image_input:
+            image_input = image_input.split(",", 1)[1]
+            
+        image_bytes = base64.b64decode(image_input)
+        
+        pil_image: Optional[Image.Image] = None
+        
+        # 1. Try OpenCV Preprocessing (Best)
+        if OPENCV_AVAILABLE:
+            try:
+                pil_image = preprocess_image_opencv(image_bytes)
+            except Exception:
+                pass
+        
+        # 2. Try PIL Preprocessing (Fallback)
+        if pil_image is None:
+            try:
+                pil_image = preprocess_image_bytes(image_bytes)
+            except Exception:
+                pass
+        
+        # 3. Raw Open (Last Resort)
+        if pil_image is None:
+             pil_image = Image.open(io.BytesIO(image_bytes))
+
+        if not PYTESSERACT_AVAILABLE:
+             # If no tesseract, we can't do much. 
+             # In future, external OCR API could be called here.
+             return ""
+
+        text = pytesseract.image_to_string(pil_image)
+        return text.strip()
+    except Exception as e:
+        print(f"OCR Error: {e}")
+        return ""
+
+
 # --- Entry point ---------------------------------------------------------
 
 
