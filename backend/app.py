@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import urllib.parse
+import base64
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 

@@ -12,14 +12,14 @@ const sections = [
     links: [
       { label: "Download iOS App", href: "/download" },
       { label: "Download Android App", href: "/download" },
-      { label: "Create Profile", href: "#signup" },
+      { label: "Create Profile", href: "/signup" },
       { label: "How It Works", href: "#how-it-works" },
     ],
   },
   {
     title: "Business",
     links: [
-      { label: "API Documentation", href: "/api-docs" },
+      { label: "API Documentation", href: "/docs" },
       { label: "Pricing", href: "#pricing" },
       { label: "Case Studies", href: "#cases" },
       { label: "Request Demo", href: "/contact" },
@@ -37,9 +37,9 @@ const sections = [
   {
     title: "Legal",
     links: [
-      { label: "Privacy Policy", href: "#privacy" },
-      { label: "Terms of Service", href: "#terms" },
-      { label: "Data Security", href: "#security" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
+      { label: "Data Security", href: "/security" },
     ],
   },
 ]

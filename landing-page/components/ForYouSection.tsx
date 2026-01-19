@@ -3,6 +3,7 @@
 import { motion } from "framer-motion"
 import { User, ScanLine, Shield, Globe, Smartphone, CheckCircle2 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 const features = [
   {
@@ -173,9 +174,12 @@ export const ForYouSection = () => {
               <Smartphone className="w-4 h-4" />
               Download App
             </button>
-            <button className="inline-flex items-center gap-2 bg-card text-foreground px-6 py-3 rounded-full text-base font-medium hover:bg-secondary transition-all duration-200 border border-border">
+            <Link 
+              href="/signup"
+              className="inline-flex items-center justify-center bg-card border border-border text-foreground px-8 py-4 rounded-full text-base font-semibold hover:border-primary/50 transition-all duration-200"
+            >
               Create Profile on Web
-            </button>
+            </Link>
           </div>
           <p className="text-sm text-muted-foreground mt-4">Free forever. No credit card required.</p>
         </motion.div>

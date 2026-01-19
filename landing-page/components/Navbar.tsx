@@ -70,7 +70,15 @@ export const Navbar = () => {
     
     if (href.startsWith("#")) {
       e.preventDefault()
-      // If we're not on the home page, navigate to home with the hash
+      
+      // CRITICAL FIX: If on /docs, force a hard reload to kill Redoc completely.
+      // Redoc often hijacks history state even after unmount or during transition.
+      if (pathname === '/docs' || pathname?.startsWith('/docs/')) {
+         window.location.href = "/" + href
+         return
+      }
+
+      // If we're not on the home page (and not on docs, which is handled above)
       if (pathname !== "/") {
         router.push("/" + href)
         return

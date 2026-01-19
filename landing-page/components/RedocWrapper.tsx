@@ -13,44 +13,76 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const initRedoc = () => {
-    if ((window as any).Redoc && containerRef.current) {
-      // Clear existing redoc instance to prevent "removeChild" errors during strict mode/re-renders
-      containerRef.current.innerHTML = "";
-      
-      (window as any).Redoc.init(
-        spec,
-        {
-          scrollYOffset: 64,
-          hideDownloadButton: true,
-          expandResponses: "200,201",
-          requiredPropsFirst: true,
-          nativeScrollbars: true,
-          disableDeepLinks: true,
-          theme: {
-            colors: {
-              primary: {
-                main: "#D65D26",
-              },
-            },
-            typography: {
-              fontFamily: "var(--font-inter)",
-              headings: {
-                fontFamily: "var(--font-figtree)",
-              },
-            },
-          },
-        },
-        containerRef.current
-      )
-    }
-  }
+
 
   useEffect(() => {
-      // If script is already loaded (e.g. navigation between pages), init manually
-      if ((window as any).Redoc) {
-          initRedoc()
-      }
+     let isMounted = true;
+     let redocContainer: HTMLDivElement | null = null;
+     
+     // Function to safely init redoc
+     const safeInit = () => {
+         if ((window as any).Redoc && containerRef.current && isMounted) {
+             // Create a fresh container for Redoc that React doesn't know about
+             // This prevents React from getting confused if Redoc modifies/removes it
+             redocContainer = document.createElement('div');
+             containerRef.current.appendChild(redocContainer);
+             
+             (window as any).Redoc.init(
+                spec,
+                {
+                  scrollYOffset: 64,
+                  hideDownloadButton: true,
+                  expandResponses: "200,201",
+                  requiredPropsFirst: true,
+                  nativeScrollbars: true,
+                  disableDeepLinks: true,
+                  theme: {
+                    colors: {
+                      primary: {
+                        main: "#D65D26",
+                      },
+                    },
+                    typography: {
+                      fontFamily: "var(--font-inter)",
+                      headings: {
+                        fontFamily: "var(--font-figtree)",
+                      },
+                    },
+                  },
+                },
+                redocContainer
+             )
+         }
+     }
+
+     if ((window as any).Redoc) {
+         safeInit()
+     } else {
+        // Retry once after short delay just in case script onload race condition
+        setTimeout(safeInit, 100)
+     }
+
+     return () => {
+        isMounted = false;
+        
+        // Cleanup Redoc
+        if ((window as any).Redoc && typeof (window as any).Redoc.destroy === 'function') {
+           try {
+             (window as any).Redoc.destroy();
+           } catch (e) {
+             console.error("Redoc destroy failed", e);
+           }
+        }
+
+        // Manually remove the element we added
+        if (redocContainer && containerRef.current) {
+            try {
+                containerRef.current.removeChild(redocContainer);
+            } catch (e) {
+                // Ignore if already removed
+            }
+        }
+     }
   }, [spec])
   
   useEffect(() => {
@@ -108,7 +140,16 @@ export const RedocWrapper = ({ spec }: RedocWrapperProps) => {
       <Script 
         src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"
         strategy="lazyOnload"
-        onLoad={initRedoc}
+        onLoad={() => {
+            // Trigger a re-render or let useEffect pick it up
+            // Since useEffect depends on [spec], we can force an update or just rely on the race check
+            // Simpler: dispatch a custom event or just set a flag.
+            // Actually, best way is to let the component re-render.
+            // But for now, we can just manually call the init logic if we were strictly outside React.
+            // Since we are inside, best to rely on state or Ref.
+            // Let's just force update via state dummy
+            setError(null) // This triggers re-render
+        }}
         onError={() => setError("Failed to load Redoc script")}
       />
     </>

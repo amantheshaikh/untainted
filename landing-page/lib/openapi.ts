@@ -3,11 +3,11 @@ export const openApiSpec = {
   "info": {
     "title": "Untainted API",
     "version": "1.0.0",
-    "description": "# Getting Started\nWelcome to the Untainted API. This API provides a robust **food intelligence layer** for platforms, enabling quick-commerce, grocery, and health apps to deliver personalized safety checks for millions of users.\n\nThe API is designed to be simple to use, with predictable resource-oriented URLs and standard HTTP response codes.\n\n## Authentication\nInclude your API key in the `x-api-key` header.\n\n```bash\ncurl -H \"x-api-key: sk_live_...\" https://api.untainted.io/analyze\n```\n\n## Core Endpoint: /analyze\nThe `/analyze` endpoint is the primary entry point.\n\n**Workflow:**\n1. **Client** sends `barcode` (and optional `image`) + `customer_uid`.\n2. **Untainted** resolves the product (DB/OpenFoodFacts) or falls back to OCR.\n3. **Untainted** fetches the customer profile from Supabase.\n4. **Analysis** runs and returns a clear `status` and verdict.\n",
+    "description": "# Getting Started\nWelcome to the Untainted API. This API provides a robust **food intelligence layer** for platforms, enabling quick-commerce, grocery, and health apps to deliver personalized safety checks for millions of users.\n\nThe API is designed to be simple to use, with predictable resource-oriented URLs and standard HTTP response codes.\n\n## Authentication\nInclude your API key in the `x-api-key` header.\n\n```bash\ncurl -H \"x-api-key: sk_live_...\" https://api.untainted.io/analyze\n```\n",
     "contact": {
       "name": "Untainted Support",
       "url": "https://untainted.io/contact",
-      "email": "support@untainted.io"
+      "email": "hello@untainted.io"
     }
   },
   "servers": [

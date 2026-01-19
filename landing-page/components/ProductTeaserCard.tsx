@@ -28,7 +28,7 @@ export const ProductTeaserCard = (props: ProductTeaserCardProps) => {
     primaryButtonText = "Start analyzing",
     primaryButtonHref = "",
     secondaryButtonText = "View API Docs",
-    secondaryButtonHref = "/api-docs",
+    secondaryButtonHref = "/docs",
   } = props
 
   // @return

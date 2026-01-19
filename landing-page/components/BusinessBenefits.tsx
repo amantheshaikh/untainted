@@ -183,7 +183,7 @@ export const BusinessBenefits = () => {
                 Request API Access
               </button>
               <button
-                onClick={() => router.push("/api-docs")}
+                onClick={() => router.push("/docs")}
                 className="inline-flex items-center justify-center gap-2 border border-border bg-card text-foreground px-6 py-3 rounded-full text-sm font-medium hover:border-primary/50 transition-all duration-200"
               >
                 View Documentation

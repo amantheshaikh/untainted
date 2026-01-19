@@ -45,8 +45,7 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-semibold text-foreground">Our Office</h3>
                     <p className="text-muted-foreground text-sm">
-                      Bengaluru, India<br />
-                      The startup capital of the east.
+                      Mumbai, India
                     </p>
                   </div>
                 </div>
@@ -54,7 +53,7 @@ export default function ContactPage() {
 
               <div className="p-6 bg-secondary/30 rounded-2xl border border-secondary">
                 <blockquote className="text-sm text-muted-foreground italic">
-                  "Untainted's API helped us increase user retention by 20% by surfacing personalized food safety alerts."
+                  "We know users care about what they eat, but we don't have the tools to evaluate ingredients at checkout. Labels aren't built for digital decisions."
                 </blockquote>
                 <div className="mt-4 flex items-center gap-2">
                   <div className="h-8 w-8 rounded-full bg-gray-200"></div>
