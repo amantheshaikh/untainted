@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Layers, Network, Scale, ScanBarcode, Camera, FileText, ArrowRight, Cpu } from "lucide-react"
+import { Layers, Network, Scale, ArrowRight, Cpu } from "lucide-react"
 
 const engineSteps = [
   {
@@ -39,23 +39,7 @@ const engineSteps = [
   },
 ]
 
-const inputModes = [
-  {
-    icon: ScanBarcode,
-    title: "Barcode Scan",
-    description: "Scan any product barcode to instantly fetch ingredient data from our database of 2L+ Indian products",
-  },
-  {
-    icon: Camera,
-    title: "Image / OCR Scan",
-    description: "Photograph the ingredient label and our OCR extracts text accurately from product packaging",
-  },
-  {
-    icon: FileText,
-    title: "Direct Text Input",
-    description: "Paste or type ingredient lists directly for products not in our database or for recipe analysis",
-  },
-]
+
 
 export const IntelligenceEngine = () => {
   return (
@@ -83,7 +67,7 @@ export const IntelligenceEngine = () => {
         </motion.div>
 
         {/* Engine Pipeline */}
-        <div className="mb-20">
+        <div className="mb-1">
           <div className="grid lg:grid-cols-3 gap-6">
             {engineSteps.map((step, index) => (
               <motion.div
@@ -134,82 +118,9 @@ export const IntelligenceEngine = () => {
           </div>
         </div>
 
-        {/* Input Modes */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-        >
-          <h3 className="text-2xl font-semibold text-foreground text-center mb-4">Three Ways to Input Data</h3>
-          <p className="text-muted-foreground text-center max-w-xl mx-auto mb-10">
-            Whether through your app, our API, or manual entry—we accept product data in multiple formats.
-          </p>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {inputModes.map((mode, index) => (
-              <motion.div
-                key={mode.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: index * 0.1 }}
-                className="bg-card rounded-xl border border-border p-5 text-center hover:border-primary/30 transition-colors"
-              >
-                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                  <mode.icon className="w-6 h-6 text-primary" />
-                </div>
-                <h4 className="text-base font-semibold text-foreground mb-2">{mode.title}</h4>
-                <p className="text-sm text-muted-foreground leading-relaxed">{mode.description}</p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
 
-        {/* API Response Preview */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="mt-16"
-        >
-          <div className="bg-card rounded-2xl border border-border overflow-hidden max-w-3xl mx-auto">
-            <div className="bg-foreground/5 px-4 py-3 border-b border-border flex items-center gap-2">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-destructive/50" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                <div className="w-3 h-3 rounded-full bg-chart-3/50" />
-              </div>
-              <span className="text-xs text-muted-foreground font-mono ml-2">API Response Example</span>
-            </div>
-            <pre className="p-6 text-sm font-mono text-foreground overflow-x-auto">
-              <code>{`{
-  "product": "Multigrain Cookies",
-  "verdict": "NOT_SAFE",
-  "confidence": 0.98,
-  "flagged_ingredients": [
-    "Refined Wheat Flour (Maida)",
-    "Butter"
-  ],
-  "reasons": [
-    {
-      "ingredient": "Refined Wheat Flour (Maida)",
-      "category": "refined_grain",
-      "conflicts_with": ["no_maida", "gluten_free"]
-    },
-    {
-      "ingredient": "Butter",
-      "category": "dairy",
-      "conflicts_with": ["dairy_free", "vegan"]
-    }
-  ],
-  "safe_alternatives": ["Ragi Cookies", "Oats Digestive"],
-  "processing_time_ms": 42
-}`}</code>
-            </pre>
-          </div>
-        </motion.div>
+
       </div>
     </section>
   )

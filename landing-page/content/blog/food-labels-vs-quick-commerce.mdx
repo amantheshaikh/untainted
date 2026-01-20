@@ -1,0 +1,63 @@
+---
+title: "Why Food Labels Were Never Designed for 10-Minute Delivery"
+description: "Studies show 60% of online grocery items miss key allergen info. How the 'swipe' UX of quick commerce creates a safety gap."
+date: "2026-01-19"
+author: "Aman Shaikh"
+tags: ["quick commerce", "ux", "safety", "labels"]
+image: "/images/blog/labels-vs-delivery.png"
+featured: false
+---
+
+## The Physical to Digital Loss
+
+Food packaging is a masterpiece of information hierarchy—refined over 50 years of retail.
+-   **Front**: Brand, Desire, Key Claims.
+-   **Back**: Truth, Facts, Warnings.
+
+You instinctively know to **turn the package around** to check the truth.
+
+## The "Swipe" Problem
+
+In a Quick Commerce app (Blinkit, Zepto, Instacart), there is no "back."
+There is a carousel of images.
+-   Image 1: Front of pack (High Res).
+-   Image 2: Lifestyle shot (Product in a bowl).
+-   Image 3: Zoomed in text (Often blurry).
+
+**90% of users never swipe to Image 3.** They make a purchase decision based on Image 1 (Brand/Desire) and the Title.
+
+<Callout type="warning" title="Missing Data Reality">
+  A 2023 study found that **over 50% of food products sold online** failed to display the allergen warnings present on physical packaging, creating a "Wild West" of safety risks. ([Source: UNSW Study](https://www.unsw.edu.au/news/2023/11/wild-west-online-food-labelling-leaving-consumers-risk-allergic))
+</Callout>
+
+## The Liability Gap
+
+Who is responsible when a customer has an anaphylactic reaction to a product bought on an app, where the warning was missing?
+Regulations like **Natasha's Law** (UK) mandated full disclosure for pre-packed foods, but the digital storefront is often specifically exempted or overlooked in older laws.
+
+## Speed Kills (Caution)
+
+Quick commerce is designed for **frictionless conversion**.
+"Add to Cart" -> "Swipe to Pay" in 30 seconds.
+Reading a label is **friction**. It slows you down. It makes you reconsider. So, apps (unintentionally) minimize it.
+
+## The Solution: Active Interception
+
+We cannot rely on users to "swipe to the 4th image and pinch-to-zoom on the ingredient list." That is a failed UX pattern.
+
+We need **Active Interception**.
+The app needs to know: "Aman is allergic to Peanuts."
+When Aman adds that chocolate bar, the *App itself* must verify the backend data. If there's a risk, it must **interrupt** the flow.
+
+> "Stop. This item has a high risk of peanuts."
+
+### Related Reading
+*   [The Hidden Risk of Quick Commerce](/blog/quick-commerce-allergen-risk)
+*   [FSSAI Labeling Rules](/blog/fssai-labeling-rules)
+
+<CTA 
+  heading="Protect Your Users" 
+  text="Don't let data gaps become health risks. Integrate Untainted's Safety API today."
+  buttonText="Read the Documentation"
+  buttonLink="/docs"
+/>

@@ -1,8 +1,9 @@
 "use client"
 
-import ContactForm from "../../components/ContactForm"
-import { Navbar } from "@/components/Navbar"
-import { Footer } from "@/components/Footer"
+import ContactForm from "../../components/sections/ContactForm"
+import NextImage from "next/image"
+import { Navbar } from "@/components/layout/Navbar"
+import { Footer } from "@/components/layout/Footer"
 import { Mail, MapPin } from "lucide-react"
 
 export default function ContactPage() {
@@ -56,7 +57,14 @@ export default function ContactPage() {
                   "We know users care about what they eat, but we don't have the tools to evaluate ingredients at checkout. Labels aren't built for digital decisions."
                 </blockquote>
                 <div className="mt-4 flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-gray-200"></div>
+                  <div className="h-8 w-8 relative rounded-full overflow-hidden">
+                    <NextImage 
+                      src="/placeholder-user.jpg" 
+                      alt="Product Lead" 
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
                   <div className="text-xs font-medium text-foreground">Product Lead @ Leading Grocery App</div>
                 </div>
               </div>

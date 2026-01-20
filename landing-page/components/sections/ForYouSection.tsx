@@ -168,7 +168,7 @@ export const ForYouSection = () => {
         >
           <div className="inline-flex flex-wrap gap-4 justify-center">
             <button
-              onClick={() => router.push('/download')}
+              onClick={() => router.push('/personal')}
               className="inline-flex items-center gap-2 bg-accent text-white px-6 py-3 rounded-full text-base font-medium hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-md"
             >
               <Smartphone className="w-4 h-4" />

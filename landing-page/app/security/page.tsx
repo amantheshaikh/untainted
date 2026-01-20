@@ -1,7 +1,7 @@
 "use client"
 
-import { Navbar } from "@/components/Navbar"
-import { Footer } from "@/components/Footer"
+import { Navbar } from "@/components/layout/Navbar"
+import { Footer } from "@/components/layout/Footer"
 import { Shield, Lock, Server, Eye } from "lucide-react"
 
 export default function SecurityPage() {

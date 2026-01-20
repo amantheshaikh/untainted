@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabaseClient"
-import { ProfileNavbar } from "@/components/ProfileNavbar"
-import { Footer } from "@/components/Footer"
+import { ProfileNavbar } from "@/components/layout/ProfileNavbar"
+import { Footer } from "@/components/layout/Footer"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { MultiSelectIngredients, Ingredient } from "@/components/ui/multi-select-ingredients"
 
 type Profile = {
   id?: string
@@ -54,6 +55,7 @@ export default function ProfilePage() {
   const [selectedDiets, setSelectedDiets] = useState<string[]>([])
   const [selectedHealth, setSelectedHealth] = useState<string[]>([])
   const [selectedAllergies, setSelectedAllergies] = useState<string[]>([])
+  const [customAvoidance, setCustomAvoidance] = useState<Ingredient[]>([])
 
   useEffect(() => {
     let mounted = true
@@ -78,6 +80,7 @@ export default function ProfilePage() {
           setSelectedDiets(Array.isArray(json.dietary_preferences) ? json.dietary_preferences : [])
           setSelectedHealth(Array.isArray(json.health_restrictions) ? json.health_restrictions : [])
           setSelectedAllergies(Array.isArray(json.allergies) ? json.allergies : [])
+          setCustomAvoidance(Array.isArray(json.custom_avoidance) ? json.custom_avoidance : [])
         }
         setLoading(false)
       }
@@ -108,7 +111,8 @@ export default function ProfilePage() {
     const profileJson = {
       dietary_preferences: selectedDiets,
       health_restrictions: selectedHealth,
-      allergies: selectedAllergies
+      allergies: selectedAllergies,
+      custom_avoidance: customAvoidance
     }
 
     const payload = {
@@ -242,6 +246,21 @@ export default function ProfilePage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="h-px bg-border my-6" />
+
+            {/* Custom Ingredients */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                 <span className="text-xl">🚫</span>
+                 <h2 className="text-lg font-semibold">Custom Avoidance List</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">Search and add specific ingredients or additives you want to avoid (e.g., "Red 40", "Palm Oil").</p>
+              <MultiSelectIngredients 
+                 selected={customAvoidance}
+                 onChange={setCustomAvoidance}
+              />
             </div>
 
             <div className="pt-6 flex justify-end">

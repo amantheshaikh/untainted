@@ -10,8 +10,8 @@ const sections = [
   {
     title: "Personal",
     links: [
-      { label: "Download iOS App", href: "/download" },
-      { label: "Download Android App", href: "/download" },
+      { label: "Download iOS App", href: "/personal" },
+      { label: "Download Android App", href: "/personal" },
       { label: "Create Profile", href: "/signup" },
       { label: "How It Works", href: "#how-it-works" },
     ],
@@ -139,7 +139,7 @@ export const Footer = () => {
                 iOS
               </button>
               <button
-                onClick={() => router.push('/download')}
+                onClick={() => router.push('/personal')}
                 className="inline-flex items-center gap-2 bg-foreground text-background px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
               >
                 <Smartphone className="w-4 h-4" />

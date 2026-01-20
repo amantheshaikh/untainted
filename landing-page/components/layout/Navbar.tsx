@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/navigation-menu"
 import { Button } from "@/components/ui/button"
 import { Menu, X } from "lucide-react"
-import { ContactDialog } from "@/components/ContactDialog"
 
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
@@ -28,7 +27,7 @@ export function Navbar() {
   }, [pathname])
 
   return (
-    <div className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur-md border-b order-border">
+    <div className="fixed top-0 inset-x-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
       <div className="container mx-auto px-4 lg:px-6 flex h-20 items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
@@ -81,30 +80,31 @@ export function Navbar() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <Link href="/pricing" legacyBehavior passHref>
-                  <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                <NavigationMenuLink asChild>
+                  <Link href="/pricing" className={navigationMenuTriggerStyle()}>
                     Pricing
-                  </NavigationMenuLink>
-                </Link>
+                  </Link>
+                </NavigationMenuLink>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                 <Link href="/how-it-works" legacyBehavior passHref>
-                  <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                <NavigationMenuLink asChild>
+                  <Link href="/how-it-works" className={navigationMenuTriggerStyle()}>
                     How it Works
-                  </NavigationMenuLink>
-                </Link>
+                  </Link>
+                </NavigationMenuLink>
               </NavigationMenuItem>
             </NavigationMenuList>
           </NavigationMenu>
         </div>
+
         {/* Right Actions */}
         <div className="hidden md:flex items-center gap-4">
           <Link href="/signin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
             Log In
           </Link>
-          <ContactDialog>
-             <Button>Contact Us</Button>
-          </ContactDialog>
+          <Button asChild>
+            <Link href="/contact">Contact Us</Link>
+          </Button>
         </div>
 
         {/* Mobile Menu Toggle */}
@@ -133,9 +133,9 @@ export function Navbar() {
              <Link href="/how-it-works" className="block px-4 py-2 font-medium hover:bg-muted rounded-md">How it Works</Link>
              <hr />
              <Link href="/signin" className="block px-4 py-2 font-medium hover:bg-muted rounded-md">Log In</Link>
-             <ContactDialog>
-                <Button className="w-full">Contact Us</Button>
-             </ContactDialog>
+             <Button className="w-full" asChild>
+               <Link href="/contact">Contact Us</Link>
+             </Button>
         </div>
        )}
     </div>

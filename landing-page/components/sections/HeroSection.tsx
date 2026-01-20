@@ -4,14 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { motion } from "framer-motion"
 
-                          <Image
-                            src="/granola-bar-healthy-snack.jpg"
-                            alt="Muesli"
-                            width={128}
-                            height={128}
-                            priority
-                            className="w-full h-full object-cover rounded-lg"
-                          />
+
 import { ArrowRight, Building2, Code2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -53,16 +46,16 @@ export const HeroSection = () => {
 
             <div className="grid grid-cols-3 gap-6 mt-12 pt-8 border-t border-border">
               <div>
-                <div className="text-2xl lg:text-3xl font-semibold text-primary">{"<50ms"}</div>
-                <div className="text-sm text-muted-foreground mt-1">API Response</div>
+                <div className="text-2xl lg:text-3xl font-bold text-[#8B5E3C]">{"<50ms"}</div>
+                <div className="text-sm text-muted-foreground mt-1">Time to Analyze</div>
               </div>
               <div>
-                <div className="text-2xl lg:text-3xl font-semibold text-primary">2L+</div>
-                <div className="text-sm text-muted-foreground mt-1">Indian Products</div>
-              </div>
-              <div>
-                <div className="text-2xl lg:text-3xl font-semibold text-primary">50K+</div>
+                <div className="text-2xl lg:text-3xl font-bold text-[#8B5E3C]">1.2L+</div>
                 <div className="text-sm text-muted-foreground mt-1">Ingredients Mapped</div>
+              </div>
+              <div>
+                <div className="text-2xl lg:text-3xl font-bold text-[#8B5E3C]">4M+</div>
+                <div className="text-sm text-muted-foreground mt-1">Product Database</div>
               </div>
             </div>
           </motion.div>

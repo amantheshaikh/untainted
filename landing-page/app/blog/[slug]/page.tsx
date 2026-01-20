@@ -1,8 +1,9 @@
 import { getBlogPosts, getBlogPost } from '@/lib/blog'
-import { Navbar } from '@/components/Navbar'
-import { Footer } from '@/components/Footer'
+import { Navbar } from "@/components/layout/Navbar"
+import { Footer } from "@/components/layout/Footer"
 import { MDXRemote } from 'next-mdx-remote/rsc'
 import Link from 'next/link'
+import NextImage from 'next/image'
 import { notFound } from 'next/navigation'
 import remarkGfm from 'remark-gfm'
 
@@ -82,9 +83,21 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
                   </span>
                </div>
              )}
-          </div>
+           </div>
 
-          <div className="prose prose-lg dark:prose-invert prose-orange mx-auto">
+           {post.metadata.image && (
+              <div className="mb-10 w-full aspect-[16/9] relative rounded-2xl overflow-hidden border border-border">
+                <NextImage 
+                  src={post.metadata.image}
+                  alt={post.metadata.title}
+                  fill
+                  className="object-cover"
+                  priority
+                />
+              </div>
+           )}
+
+           <div className="prose prose-lg dark:prose-invert prose-orange mx-auto">
             <MDXRemote
               source={post.content}
               components={components}

@@ -3,8 +3,8 @@
 import Image from "next/image"
 
 import { useRouter } from "next/navigation"
-import { supabase } from "../lib/supabaseClient"
-import { Button } from "./ui/button"
+import { supabase } from "@/lib/supabaseClient"
+import { Button } from "@/components/ui/button"
 
 export const ProfileNavbar = () => {
   const router = useRouter()
@@ -21,7 +21,7 @@ export const ProfileNavbar = () => {
           {/* Logo */}
           <div className="flex-shrink-0">
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/profile")}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-200"
             >
               <Image src="/images/full-20logo.png" alt="Untainted" width={140} height={32} className="h-8 w-auto" />

@@ -1,4 +1,4 @@
-import { RedocWrapper } from "@/components/RedocWrapper"
+import { RedocWrapper } from "@/components/data-display/RedocWrapper"
 
 export const metadata = {
   title: "API Reference - Untainted Docs",

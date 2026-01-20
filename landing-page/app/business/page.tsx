@@ -1,37 +1,44 @@
-import { Navbar } from "@/components/Navbar"
-import { Footer } from "@/components/Footer"
-import { BusinessBenefits } from "@/components/BusinessBenefits"
-import { BusinessUseCases } from "@/components/BusinessUseCases"
-import { IntelligenceEngine } from "@/components/IntelligenceEngine"
-import { PricingSection } from "@/components/PricingSection"
+"use client"
+
+import { Navbar } from "@/components/layout/Navbar"
+import { Footer } from "@/components/layout/Footer"
+import { BusinessHero } from "@/components/sections/BusinessHero"
+import { BusinessVerticals } from "@/components/sections/BusinessVerticals"
+import { VerticalsDemo } from "@/components/sections/VerticalsDemo"
+import { CoreValueProp } from "@/components/sections/CoreValueProp"
+import { IntegrationShowcase } from "@/components/sections/IntegrationShowcase"
+import { APIFeatures } from "@/components/sections/APIFeatures"
 import Link from "next/link"
 
 export default function BusinessPage() {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen pt-20">
-        <section className="relative px-6 lg:px-8 py-24 md:py-32 max-w-7xl mx-auto text-center">
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-              Food Intelligence for <span className="text-primary">Enterprise</span>
-            </h1>
-            <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10">
-              Transform your grocery platform, health app, or delivery service with our powerful API. deliver personalized safety verdicts at scale.
-            </p>
-            <div className="flex gap-4 justify-center">
-               <Link href="/docs" className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity">
-                  Read API Docs
-               </Link>
-               <Link href="#pricing" className="bg-secondary text-secondary-foreground px-8 py-3 rounded-full font-semibold hover:bg-secondary/80 transition-opacity">
-                  View Pricing
-               </Link>
+      <main className="min-h-screen">
+
+
+        <BusinessHero />
+        <BusinessVerticals />
+        <CoreValueProp />
+        <IntegrationShowcase />
+        <VerticalsDemo />
+        <APIFeatures />
+
+        {/* Bottom CTA Section */}
+        <section className="py-24 bg-secondary/30 border-t border-border">
+            <div className="container mx-auto px-6 text-center">
+                <h2 className="text-3xl font-bold tracking-tight mb-4">Ready to Integrate?</h2>
+                <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+                    Join the leading food platforms using Untainted to deliver safer, smarter food choices.
+                </p>
+                <div className="flex justify-center">
+                    <Link href="/contact" className="bg-primary text-primary-foreground px-10 py-4 rounded-full font-bold text-lg hover:opacity-90 transition-all shadow-lg hover:shadow-xl">
+                        Contact Us
+                    </Link>
+                </div>
             </div>
         </section>
 
-        <BusinessBenefits />
-        <IntelligenceEngine />
-        <BusinessUseCases />
-        <PricingSection />
       </main>
       <Footer />
     </>

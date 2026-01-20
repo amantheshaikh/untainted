@@ -176,7 +176,7 @@ const useCases = [
 
 export const BusinessUseCases = () => {
   return (
-    <section className="w-full bg-secondary/30 py-20">
+    <section id="use-cases" className="w-full bg-secondary/30 py-20">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         {/* Header */}
         <motion.div

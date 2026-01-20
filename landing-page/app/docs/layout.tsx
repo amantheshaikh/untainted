@@ -1,5 +1,7 @@
-import { Navbar } from "@/components/Navbar"
-import { Footer } from "@/components/Footer"
+import { Navbar } from "@/components/layout/Navbar"
+import { Footer } from "@/components/layout/Footer"
+import { DocsSidebar } from "@/components/layout/DocsSidebar"
+import { DocsMobileNav } from "@/components/layout/DocsMobileNav"
 
 export default function DocsLayout({
   children,

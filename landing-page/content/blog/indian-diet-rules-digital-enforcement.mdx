@@ -1,0 +1,58 @@
+---
+title: "Jain, Vegetarian, Vegan: Why Indian Diet Rules Are Hard to Enforce Digitally"
+description: "With 39% of Indians being Vegetarian and 92% of Jains restricting root vegetables, simple 'Veg/Non-Veg' toggles are failing to capture the nuance."
+date: "2026-01-20"
+author: "Aman Shaikh"
+tags: ["india", "dietary laws", "jain", "vegan", "culture"]
+image: "/images/blog/indian-diets.png"
+featured: false
+---
+
+## The Complexity of "Veg"
+
+In the West, "Vegetarian" usually just means "No Meat."
+In India, "Veg" is a religion, a caste marker, and a way of life—with a dozen variations.
+
+According to **Pew Research Center**, **39% of Indian adults** describe themselves as vegetarian. However, a staggering **81% limit meat** in some way (e.g., no beef, no pork, or only on certain days) ([Source: Pew Research](https://www.pewresearch.org/religion/2021/06/29/religion-and-food/)).
+
+### The Spectrum
+1.  **Eggetarian**: Eats eggs, no meat.
+2.  **Pure Veg (Lacto-Vegetarian)**: No eggs, eats dairy.
+3.  **Vegan**: No animal products at all (No dairy, no honey).
+4.  **Jain**: No meat, no eggs, no root vegetables (onion, garlic, potato, carrot). **92% of Jains** follow a strict vegetarian diet ([Source: Pew](https://www.pewresearch.org/religion/2021/06/29/religion-and-food/)).
+5.  **Sattvic**: Similar to Jain/Veg but also excludes stimulants like caffeine and chilies.
+
+## The Digital Failure
+
+Most global food APIs (like OpenFoodFacts or USDA) have a simple `is_vegetarian` boolean. This fails in India immediately.
+
+-   **Case 1: The Egg Problem.**
+    A cake marked "Vegetarian" in Europe often contains eggs. In India, that requires a **Red Dot** (Non-Veg), while eggless is **Green Dot**. Imported goods frequently confuse this, adhering to EU standards but violating Indian cultural expectations.
+
+-   **Case 2: The Jain Nightmare.**
+    "Natural Flavors" often contain onion powder. A product looks Veg but breaks Jain vows.
+    Ordering a "Veg Burger" on an app? If the sauce contains garlic, it is *not* Jain-compliant. Most delivery apps don't track ingredients at this granularity.
+
+-   **Case 3: Cross-Contamination.**
+    "Veg" food cooked in the same oil as "Non-Veg" food. For many strict vegetarians, this renders the food inedible.
+
+## Building for the Indian Context
+
+To solve this, Untainted treats Indian diets not as simple "tags" but as **exclusion lists**.
+A **Jain Profile** isn't just `Tag: Jain`. It is:
+`Exclude: [Meat, Egg, Seafood, Onion, Garlic, Potato, Carrot, ...]`
+
+We scan ingredient sub-lists for hidden root vegetables. We flag "E120 (Carmine)" as non-veg because it is derived from crushed insects.
+
+India's dietary complexity is a feature, not a bug. Our software needs to respect that.
+
+### Related Reading
+*   [FSSAI Labeling Rules: What They Do — and Don’t — Protect You From](/blog/fssai-labeling-rules)
+*   [Why Food Labels Were Never Designed for 10-Minute Delivery](/blog/food-labels-vs-quick-commerce)
+
+<CTA 
+  heading="Market to Complex Diets" 
+  text="Enable 'Jain-Friendly' or 'Sattvic' filters on your delivery platform with one API integration."
+  buttonText="View Vertical Solutions"
+  buttonLink="/business"
+/>

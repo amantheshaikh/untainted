@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.untainted.io"),
   title: "Untainted – Food Intelligence API for Safer, Personalized Decisions",
   description:
-    "API-first food intelligence platform that helps commerce and delivery apps give users personalized, safer food decisions at the moment of purchase.",
+    "An API-first food intelligence platform enabling personalized, safer food decisions for commerce and delivery apps through advanced ingredient analysis.",
   generator: "v0.app",
   icons: {
     icon: [
@@ -48,7 +48,7 @@ const jsonLd = {
     "price": "0",
     "priceCurrency": "USD",
   },
-  "description": "API-first food intelligence platform that helps commerce and delivery apps give users personalized, safer food decisions at the moment of purchase.",
+  "description": "An API-first food intelligence platform enabling personalized, safer food decisions for commerce and delivery apps through advanced ingredient analysis.",
   "image": "https://www.untainted.io/opengraph-image",
 }
 

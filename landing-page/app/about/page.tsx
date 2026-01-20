@@ -3,8 +3,8 @@
 import { motion } from "framer-motion"
 import { ArrowRight, Target, Layers, Shield, ChevronRight } from "lucide-react"
 import Link from "next/link"
-import { Navbar } from "@/components/Navbar"
-import { Footer } from "@/components/Footer"
+import { Navbar } from "@/components/layout/Navbar"
+import { Footer } from "@/components/layout/Footer"
 
 export default function AboutPage() {
   return (
@@ -287,7 +287,7 @@ export default function AboutPage() {
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
-                href="/download"
+                href="/personal"
                 className="inline-flex items-center justify-center gap-2 bg-secondary text-secondary-foreground px-6 py-3 rounded-full font-medium hover:bg-secondary/80 transition-colors"
               >
                 Get the App

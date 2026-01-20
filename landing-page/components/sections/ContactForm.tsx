@@ -1,13 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { supabase } from "../lib/supabaseClient"
+import { supabase } from "@/lib/supabaseClient"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 
-import { sendContactEmail } from "../app/actions"
+import { sendContactEmail } from "@/app/actions"
 
 export default function ContactForm({ subject = "General inquiry" }: { subject?: string }) {
   const [name, setName] = useState("")

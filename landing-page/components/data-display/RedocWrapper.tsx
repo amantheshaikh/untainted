@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import Script from "next/script"
-import { Navbar } from "@/components/Navbar"
-import { Footer } from "@/components/Footer"
+import { Navbar } from "@/components/layout/Navbar"
+import { Footer } from "@/components/layout/Footer"
 
 interface RedocWrapperProps {
   specUrl?: string

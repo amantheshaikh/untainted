@@ -134,7 +134,7 @@ export const DemoSection = () => {
                     <button
                       key={p.name}
                       onClick={() => setSelectedProduct(index)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer ${
                         selectedProduct === index
                           ? "bg-primary text-primary-foreground"
                           : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
