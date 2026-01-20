@@ -1,14 +1,17 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { Navbar } from "@/components/layout/Navbar"
 import { Footer } from "@/components/layout/Footer"
 import { BusinessHero } from "@/components/sections/BusinessHero"
-import { BusinessVerticals } from "@/components/sections/BusinessVerticals"
-import { VerticalsDemo } from "@/components/sections/VerticalsDemo"
-import { CoreValueProp } from "@/components/sections/CoreValueProp"
-import { IntegrationShowcase } from "@/components/sections/IntegrationShowcase"
-import { APIFeatures } from "@/components/sections/APIFeatures"
 import Link from "next/link"
+
+// Lazy load below-the-fold components
+const BusinessVerticals = dynamic(() => import("@/components/sections/BusinessVerticals").then(mod => mod.BusinessVerticals))
+const VerticalsDemo = dynamic(() => import("@/components/sections/VerticalsDemo").then(mod => mod.VerticalsDemo))
+const CoreValueProp = dynamic(() => import("@/components/sections/CoreValueProp").then(mod => mod.CoreValueProp))
+const IntegrationShowcase = dynamic(() => import("@/components/sections/IntegrationShowcase").then(mod => mod.IntegrationShowcase))
+const APIFeatures = dynamic(() => import("@/components/sections/APIFeatures").then(mod => mod.APIFeatures))
 
 export default function BusinessPage() {
   return (
