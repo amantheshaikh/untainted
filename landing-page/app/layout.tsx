@@ -24,16 +24,59 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.untainted.io"),
-  title: "Untainted – Food Intelligence API for Safer, Personalized Decisions",
+  title: {
+    default: "Untainted – Food Intelligence API for Safer, Personalized Decisions",
+    template: "%s | Untainted"
+  },
   description:
     "An API-first food intelligence platform enabling personalized, safer food decisions for commerce and delivery apps through advanced ingredient analysis.",
-  generator: "v0.app",
+  keywords: ["food intelligence api", "ingredient analysis", "clean label", "food safety API", "allergen detection", "personalized nutrition", "grocery api", "FSSAI compliance"],
+  authors: [{ name: "Untainted Team" }],
+  creator: "Untainted",
+  publisher: "Untainted",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://www.untainted.io",
+    title: "Untainted – Food Intelligence API",
+    description: "Build safer, smarter food experiences with the Untainted API.",
+    siteName: "Untainted",
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Untainted Food Intelligence API",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Untainted – Food Intelligence API",
+    description: "Build safer, smarter food experiences with the Untainted API.",
+    images: ["/opengraph-image.png"],
+    creator: "@untainted_io",
+  },
   icons: {
     icon: [
       { url: "/favicon.png", type: "image/png" },
       { url: "/favicon.svg", type: "image/svg+xml" },
     ],
     apple: "/apple-icon.png",
+  },
+  alternates: {
+    canonical: "./",
   },
 }
 
@@ -50,6 +93,16 @@ const jsonLd = {
   },
   "description": "An API-first food intelligence platform enabling personalized, safer food decisions for commerce and delivery apps through advanced ingredient analysis.",
   "image": "https://www.untainted.io/opengraph-image",
+  "url": "https://www.untainted.io",
+  "sameAs": [
+    "https://twitter.com/untainted_io",
+    "https://linkedin.com/company/untainted-io"
+  ],
+  "author": {
+    "@type": "Organization",
+    "name": "Untainted",
+    "url": "https://www.untainted.io"
+  }
 }
 
 export default function RootLayout({

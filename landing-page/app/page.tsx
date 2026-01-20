@@ -15,6 +15,15 @@ const FAQSection = dynamic(() => import("@/components/sections/FAQSection").then
 const FeaturesSection = dynamic(() => import("@/components/sections/FeaturesSection").then(mod => mod.FeaturesSection))
 const ForYouSection = dynamic(() => import("@/components/sections/ForYouSection").then(mod => mod.ForYouSection))
 
+import { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: {
+    absolute: "Untainted – The Food Intelligence API"
+  },
+  description: "Analyze ingredients, detect allergens, and personalize food choices at scale. The API-first platform for modern food commerce."
+}
+
 export default function Page() {
   return (
     <>

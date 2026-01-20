@@ -1,10 +1,14 @@
-"use client"
-
 import dynamic from "next/dynamic"
 import { Navbar } from "@/components/layout/Navbar"
 import { Footer } from "@/components/layout/Footer"
 import { BusinessHero } from "@/components/sections/BusinessHero"
 import Link from "next/link"
+import { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Untainted for Business – Scale Your Food Platform",
+  description: "Integrate food intelligence into your grocery or delivery app. Increase conversion, reduce liability, and automate FSSAI compliance."
+}
 
 // Lazy load below-the-fold components
 const BusinessVerticals = dynamic(() => import("@/components/sections/BusinessVerticals").then(mod => mod.BusinessVerticals))
