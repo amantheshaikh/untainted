@@ -136,7 +136,7 @@ export const RedocWrapper = ({ spec, specUrl = "/openapi.yaml" }: RedocWrapperPr
         </div>
       </main>
       <Script 
-        src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"
+        src="/scripts/redoc.standalone.js"
         strategy="lazyOnload"
         onLoad={() => {
             setIsScriptLoaded(true)
