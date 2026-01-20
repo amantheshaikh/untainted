@@ -3,7 +3,14 @@ import path from 'path'
 import matter from 'gray-matter'
 
 // Directory to store markdown files
-const postsDirectory = path.join(process.cwd(), 'content/blog')
+// Directory to store markdown files
+// Handle both app root and project root execution contexts
+const possiblePaths = [
+  path.join(process.cwd(), 'content/blog'),
+  path.join(process.cwd(), 'landing-page/content/blog'),
+]
+
+export const postsDirectory = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0]
 
 export interface BlogPost {
   slug: string

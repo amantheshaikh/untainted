@@ -1,253 +1,169 @@
 "use client"
 
-import Image from "next/image"
+import * as React from "react"
 import Link from "next/link"
-import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import Image from "next/image"
+import { usePathname } from "next/navigation"
+import { cn } from "@/lib/utils"
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu"
+import { Button } from "@/components/ui/button"
 import { Menu, X } from "lucide-react"
-import { useRouter, usePathname } from "next/navigation"
-import { supabase } from "../lib/supabaseClient"
-import { LogOut } from "lucide-react"
+import { ContactDialog } from "@/components/ContactDialog"
 
-const navigationLinks = [
-  { name: "For Business", href: "#for-business" },
-  { name: "For Personal", href: "#for-personal" },
-  { name: "How It Works", href: "#how-it-works" },
-  { name: "Documentation", href: "/docs" },
-  { name: "Pricing", href: "#pricing" },
-]
-
-export const Navbar = () => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isScrolled, setIsScrolled] = useState(false)
-
-  const router = useRouter()
+export function Navbar() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
   const pathname = usePathname()
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20)
-    }
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
-  useEffect(() => {
-    // Check auth state
-    const checkAuth = async () => {
-      if (!supabase || !supabase.auth || !supabase.auth.getUser) return setIsAuthenticated(false)
-      const { data: { user } } = await supabase.auth.getUser()
-      setIsAuthenticated(!!user)
-    }
-    checkAuth()
-
-    // Listen for auth changes
-    let subscription: any
-    if (supabase && supabase.auth && supabase.auth.onAuthStateChange) {
-      const { data } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-        setIsAuthenticated(!!session?.user)
-      })
-      subscription = data?.subscription || data
-    }
-
-    return () => {
-      if (subscription && subscription.unsubscribe) subscription.unsubscribe()
-    }
-  }, [])
-
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen)
-  }
-
-  const closeMobileMenu = () => {
+  // Close mobile menu on route change
+  React.useEffect(() => {
     setIsMobileMenuOpen(false)
-  }
-
-  const handleLinkClick = (e: React.MouseEvent, href: string) => {
-    closeMobileMenu()
-    
-    if (href.startsWith("#")) {
-      e.preventDefault()
-      
-      // CRITICAL FIX: If on /docs, force a hard reload to kill Redoc completely.
-      // Redoc often hijacks history state even after unmount or during transition.
-      if (pathname === '/docs' || pathname?.startsWith('/docs/')) {
-         window.location.href = "/" + href
-         return
-      }
-
-      // If we're not on the home page (and not on docs, which is handled above)
-      if (pathname !== "/") {
-        router.push("/" + href)
-        return
-      }
-      
-      // If we are on home page, scroll to element
-      const element = document.querySelector(href)
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth" })
-      }
-    }
-    // For non-hash links, let next/link handle it normally
-  }
+  }, [pathname])
 
   return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? "bg-background/95 backdrop-blur-md shadow-sm" : "bg-transparent"
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          {/* Logo */}
-          <div className="flex-shrink-0">
-            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-200">
-              <Image src="/images/full-20logo.png" alt="Untainted" width={140} height={32} className="h-8 w-auto" />
-            </Link>
-          </div>
+    <div className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur-md border-b order-border">
+      <div className="container mx-auto px-4 lg:px-6 flex h-20 items-center justify-between">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2">
+            <Image src="/images/full-20logo.png" alt="Untainted" width={140} height={32} className="h-8 w-auto" />
+        </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:block">
-            <div className="ml-10 flex items-baseline gap-8">
-              {navigationLinks.map((link) => {
-                const isHash = link.href.startsWith("#")
-                
-                if (isHash) {
-                  return (
-                    <a
-                      key={link.name}
-                      href={link.href}
-                      onClick={(e) => handleLinkClick(e, link.href)}
-                      className="text-foreground/80 hover:text-foreground px-3 py-2 text-base font-medium transition-colors duration-200 relative group cursor-pointer"
-                    >
-                      <span>{link.name}</span>
-                      <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full" />
-                    </a>
-                  )
-                }
-
-                return (
-                  <Link
-                    key={link.name}
-                    href={link.href}
-                    className="text-foreground/80 hover:text-foreground px-3 py-2 text-base font-medium transition-colors duration-200 relative group"
-                  >
-                    <span>{link.name}</span>
-                    <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full" />
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="hidden md:flex items-center gap-3">
-            {/* Only show Sign Out when authenticated and not on auth pages */}
-            {isAuthenticated && !["/signin", "/signup"].includes(pathname || "") ? (
-              <button
-                onClick={async () => {
-                  await supabase.auth.signOut()
-                  router.push("/")
-                  router.refresh()
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-border text-foreground font-medium bg-transparent hover:bg-secondary transition-all duration-150"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </button>
-            ) : (
-              <>
-                <Link
-                  href="/signin"
-                  className="px-4 py-2 rounded-full border-2 border-primary text-primary font-medium bg-transparent hover:opacity-90 transition-all duration-150"
-                >
-                  Log In
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex">
+          <NavigationMenu>
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger>Products</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
+                    <li className="row-span-3">
+                      <NavigationMenuLink asChild>
+                        <Link
+                          className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
+                          href="/"
+                        >
+                          <div className="mb-2 mt-4 text-lg font-medium">
+                            Untainted
+                          </div>
+                          <p className="text-sm leading-tight text-muted-foreground">
+                            Food intelligence for everyone. Safe, transparent, and personalized.
+                          </p>
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <ListItem href="/business" title="For Business">
+                      API and data solutions for enterprise and retail.
+                    </ListItem>
+                    <ListItem href="/personal" title="For Personal">
+                      The app for personalized food safety and diet tracking.
+                    </ListItem>
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger>Resources</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px] ">
+                    <ListItem href="/blog" title="Blog">
+                      Latest news, updates, and deep dives into food tech.
+                    </ListItem>
+                    <ListItem href="/docs" title="Documentation">
+                      Comprehensive guides and API reference for developers.
+                    </ListItem>
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+              <NavigationMenuItem>
+                <Link href="/pricing" legacyBehavior passHref>
+                  <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                    Pricing
+                  </NavigationMenuLink>
                 </Link>
-
-                <Link
-                  href="/signup"
-                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-base font-medium hover:opacity-90 transition-all duration-200 shadow-sm"
-                >
-                  Sign Up
+              </NavigationMenuItem>
+              <NavigationMenuItem>
+                 <Link href="/how-it-works" legacyBehavior passHref>
+                  <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                    How it Works
+                  </NavigationMenuLink>
                 </Link>
-              </>
-            )}
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="md:hidden">
-            <button
-              onClick={toggleMobileMenu}
-              className="text-foreground hover:text-primary p-2 rounded-md transition-colors duration-200"
-              aria-label="Toggle mobile menu"
-            >
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
         </div>
+        {/* Right Actions */}
+        <div className="hidden md:flex items-center gap-4">
+          <Link href="/signin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Log In
+          </Link>
+          <ContactDialog>
+             <Button>Contact Us</Button>
+          </ContactDialog>
+        </div>
+
+        {/* Mobile Menu Toggle */}
+         <button
+            className="md:hidden p-2 text-foreground"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X /> : <Menu />}
+          </button>
       </div>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="md:hidden bg-background/95 backdrop-blur-md border-t border-border"
-          >
-            <div className="px-6 py-6 space-y-4">
-              {navigationLinks.map((link) => {
-                 const isHash = link.href.startsWith("#")
-                 
-                 if (isHash) {
-                   return (
-                    <a
-                      key={link.name}
-                      href={link.href}
-                      onClick={(e) => handleLinkClick(e, link.href)}
-                      className="block w-full text-left text-foreground hover:text-primary py-3 text-lg font-medium transition-colors duration-200 cursor-pointer"
-                    >
-                      <span>{link.name}</span>
-                    </a>
-                   )
-                 }
-
-                 return (
-                    <Link
-                      key={link.name}
-                      href={link.href}
-                      className="block w-full text-left text-foreground hover:text-primary py-3 text-lg font-medium transition-colors duration-200"
-                      onClick={closeMobileMenu}
-                    >
-                      <span>{link.name}</span>
-                    </Link>
-                 )
-              })}
-
-              <div className="pt-4 border-t border-border space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Account</p>
-                <Link
-                  href="/signin"
-                  onClick={closeMobileMenu}
-                  className="w-full flex items-center gap-3 border-2 border-primary text-primary px-4 py-3 rounded-xl font-medium hover:opacity-90 transition-all duration-200"
-                >
-                  Log In
-                </Link>
-                <Link
-                  href="/signup"
-                  onClick={closeMobileMenu}
-                  className="w-full flex items-center gap-3 bg-primary text-primary-foreground px-4 py-3 rounded-xl font-medium hover:opacity-90 transition-all duration-200"
-                >
-                  Sign Up
-                </Link>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </nav>
+       {/* Mobile Menu Content */}
+       {isMobileMenuOpen && (
+        <div className="md:hidden absolute top-20 inset-x-0 bg-background border-b border-border p-4 shadow-lg flex flex-col gap-4">
+             <div className="space-y-4">
+                <div className="font-semibold text-muted-foreground px-2">Products</div>
+                <Link href="/business" className="block px-4 py-2 hover:bg-muted rounded-md">For Business</Link>
+                <Link href="/personal" className="block px-4 py-2 hover:bg-muted rounded-md">For Personal</Link>
+             </div>
+             <div className="space-y-4">
+                <div className="font-semibold text-muted-foreground px-2">Resources</div>
+                <Link href="/blog" className="block px-4 py-2 hover:bg-muted rounded-md">Blog</Link>
+                <Link href="/docs" className="block px-4 py-2 hover:bg-muted rounded-md">Documentation</Link>
+             </div>
+             <Link href="/pricing" className="block px-4 py-2 font-medium hover:bg-muted rounded-md">Pricing</Link>
+             <Link href="/how-it-works" className="block px-4 py-2 font-medium hover:bg-muted rounded-md">How it Works</Link>
+             <hr />
+             <Link href="/signin" className="block px-4 py-2 font-medium hover:bg-muted rounded-md">Log In</Link>
+             <ContactDialog>
+                <Button className="w-full">Contact Us</Button>
+             </ContactDialog>
+        </div>
+       )}
+    </div>
   )
 }
+
+const ListItem = React.forwardRef<
+  React.ElementRef<"a">,
+  React.ComponentPropsWithoutRef<"a">
+>(({ className, title, children, ...props }, ref) => {
+  return (
+    <li>
+      <NavigationMenuLink asChild>
+        <a
+          ref={ref}
+          className={cn(
+            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+            className
+          )}
+          {...props}
+        >
+          <div className="text-sm font-medium leading-none">{title}</div>
+          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+            {children}
+          </p>
+        </a>
+      </NavigationMenuLink>
+    </li>
+  )
+})
+ListItem.displayName = "ListItem"
