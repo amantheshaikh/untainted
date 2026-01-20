@@ -23,6 +23,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.untainted.io"),
   title: "Untainted – Food Intelligence API for Safer, Personalized Decisions",
   description:
     "API-first food intelligence platform that helps commerce and delivery apps give users personalized, safer food decisions at the moment of purchase.",
@@ -36,6 +37,21 @@ export const metadata: Metadata = {
   },
 }
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Untainted",
+  "applicationCategory": "HealthApplication",
+  "operatingSystem": "All",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD",
+  },
+  "description": "API-first food intelligence platform that helps commerce and delivery apps give users personalized, safer food decisions at the moment of purchase.",
+  "image": "https://www.untainted.io/opengraph-image",
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -47,6 +63,10 @@ export default function RootLayout({
         className={`${inter.variable} ${figtree.variable} ${geistMono.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <main>{children}</main>
         <Analytics />
         <SpeedInsights />
