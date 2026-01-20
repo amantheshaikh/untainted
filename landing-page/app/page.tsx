@@ -1,17 +1,19 @@
+import dynamic from 'next/dynamic'
 import { Navbar } from "@/components/layout/Navbar"
 import { HeroSection } from "@/components/sections/HeroSection"
-import { BuiltForPlatforms } from "@/components/sections/BuiltForPlatforms"
-import { BusinessBenefits } from "@/components/sections/BusinessBenefits"
-import { BusinessUseCases } from "@/components/sections/BusinessUseCases"
-
-import { IntelligenceEngine } from "@/components/sections/IntelligenceEngine"
-import { CaseStudiesCarousel } from "@/components/sections/CaseStudiesCarousel"
-import { DemoSection } from "@/components/sections/DemoSection"
-import { PricingSection } from "@/components/sections/PricingSection"
-import { FAQSection } from "@/components/sections/FAQSection"
-import { FeaturesSection } from "@/components/sections/FeaturesSection"
-import { ForYouSection } from "@/components/sections/ForYouSection"
 import { Footer } from "@/components/layout/Footer"
+
+// Lazy load below-the-fold components to reduce initial bundle size
+const BuiltForPlatforms = dynamic(() => import("@/components/sections/BuiltForPlatforms").then(mod => mod.BuiltForPlatforms))
+const BusinessBenefits = dynamic(() => import("@/components/sections/BusinessBenefits").then(mod => mod.BusinessBenefits))
+const BusinessUseCases = dynamic(() => import("@/components/sections/BusinessUseCases").then(mod => mod.BusinessUseCases))
+const IntelligenceEngine = dynamic(() => import("@/components/sections/IntelligenceEngine").then(mod => mod.IntelligenceEngine))
+const CaseStudiesCarousel = dynamic(() => import("@/components/sections/CaseStudiesCarousel").then(mod => mod.CaseStudiesCarousel))
+const DemoSection = dynamic(() => import("@/components/sections/DemoSection").then(mod => mod.DemoSection))
+const PricingSection = dynamic(() => import("@/components/sections/PricingSection").then(mod => mod.PricingSection))
+const FAQSection = dynamic(() => import("@/components/sections/FAQSection").then(mod => mod.FAQSection))
+const FeaturesSection = dynamic(() => import("@/components/sections/FeaturesSection").then(mod => mod.FeaturesSection))
+const ForYouSection = dynamic(() => import("@/components/sections/ForYouSection").then(mod => mod.ForYouSection))
 
 export default function Page() {
   return (
