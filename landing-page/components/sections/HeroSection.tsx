@@ -6,34 +6,43 @@ import { motion } from "framer-motion"
 
 
 import { ArrowRight, Building2, Code2 } from "lucide-react"
-import { useRouter } from "next/navigation"
-
 export const HeroSection = () => {
-  const router = useRouter()
   return (
     <section id="home" className="w-full pt-32 pb-20 px-6 lg:px-8 bg-background">
       <div className="max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left Column - Content */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.645, 0.045, 0.355, 1] }}
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-6">
+          <div className="flex flex-col justify-center">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-6 self-start"
+            >
               <Code2 className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium text-primary">Personalized Food Intelligence for India</span>
-            </div>
+            </motion.div>
 
+            {/* H1 - Rendered immediately for LCP */}
             <h1 className="text-4xl lg:text-5xl xl:text-6xl font-medium leading-tight tracking-tight text-foreground mb-6 text-balance">
               Smarter Food Decisions. <span className="text-primary">Built Into Your Platform.</span>
             </h1>
 
-            <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed mb-8 max-w-xl">
+            <motion.p 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="text-lg lg:text-xl text-muted-foreground leading-relaxed mb-8 max-w-xl"
+            >
               The food intelligence layer for India's leading platforms. We help quick-commerce, grocery, food delivery and health apps deliver personalized, safer food decisions to millions of users.
-            </p>
+            </motion.p>
 
-            <div className="flex flex-wrap gap-4">
+            <motion.div 
+               initial={{ opacity: 0, y: 10 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ duration: 0.5, delay: 0.2 }}
+               className="flex flex-wrap gap-4"
+            >
               <Link
                 href="/docs"
                 className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full text-base font-medium hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-md group"
@@ -42,9 +51,14 @@ export const HeroSection = () => {
                 Get API Access
                 <ArrowRight className="w-4 h-4 transition-transform duration-150 group-hover:translate-x-1" />
               </Link>
-            </div>
+            </motion.div>
 
-            <div className="grid grid-cols-3 gap-6 mt-12 pt-8 border-t border-border">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="grid grid-cols-3 gap-6 mt-12 pt-8 border-t border-border"
+            >
               <div>
                 <div className="text-2xl lg:text-3xl font-bold text-[#8B5E3C]">{"<50ms"}</div>
                 <div className="text-sm text-muted-foreground mt-1">Time to Analyze</div>
@@ -57,8 +71,8 @@ export const HeroSection = () => {
                 <div className="text-2xl lg:text-3xl font-bold text-[#8B5E3C]">4M+</div>
                 <div className="text-sm text-muted-foreground mt-1">Product Database</div>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
 
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -99,6 +113,7 @@ export const HeroSection = () => {
                             width={64}
                             height={64}
                             className="w-full h-full object-cover rounded-lg"
+                            priority
                           />
                         </div>
                         <div className="flex-1">

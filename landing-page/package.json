@@ -71,10 +71,10 @@
   },
   "browserslist": [
     "chrome >= 100",
-    "firefox >= 100",
-    "safari >= 15",
+    "firefox >= 102",
+    "safari >= 16",
     "edge >= 100",
-    "ios >= 15"
+    "ios >= 16"
   ],
   "devDependencies": {
     "@eslint/js": "^9.21.0",
