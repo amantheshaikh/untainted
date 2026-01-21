@@ -19,7 +19,7 @@ import { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Untainted – The Food Intelligence API"
+    absolute: "Untainted - Providing Personalized Food Intelligence to Platforms"
   },
   description: "Analyze ingredients, detect allergens, and personalize food choices at scale. The API-first platform for modern food commerce."
 }

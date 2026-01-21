@@ -25,7 +25,7 @@ export const HeroSection = () => {
 
             {/* H1 - Rendered immediately for LCP */}
             <h1 className="text-4xl lg:text-5xl xl:text-6xl font-medium leading-tight tracking-tight text-foreground mb-6 text-balance">
-              Smarter Food Decisions. <span className="text-primary">Built Into Your Platform.</span>
+              Personalized Food Intelligence. <span className="text-primary">Built Into Your Platform.</span>
             </h1>
 
             <motion.p 
