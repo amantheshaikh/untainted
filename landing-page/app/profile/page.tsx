@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { MultiSelectIngredients, Ingredient } from "@/components/ui/multi-select-ingredients"
+import { Textarea } from "@/components/ui/textarea"
+import { Sparkles } from "lucide-react"
+import { parseDietaryProfile } from "../../lib/profile-parser"
 
 type Profile = {
   id?: string
@@ -52,10 +55,59 @@ export default function ProfilePage() {
 
   // Local state for form fields
   const [name, setName] = useState("")
+  const [bioInput, setBioInput] = useState("")
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  
   const [selectedDiets, setSelectedDiets] = useState<string[]>([])
   const [selectedHealth, setSelectedHealth] = useState<string[]>([])
   const [selectedAllergies, setSelectedAllergies] = useState<string[]>([])
   const [customAvoidance, setCustomAvoidance] = useState<Ingredient[]>([])
+
+  const handleAnalyzeBio = async () => {
+    setIsAnalyzing(true)
+    
+    // Simulate initial parsing delay
+    await new Promise(r => setTimeout(r, 600))
+
+    const result = parseDietaryProfile(bioInput)
+
+    // 1. Reset & Set structured tags
+    // Overwrite previous selections to ensure clean state as requested
+    setSelectedDiets(result.diets) 
+    setSelectedHealth(result.health)
+    setSelectedAllergies(result.allergies)
+
+    // 2. Process Custom Terms (Async Ingredient Match)
+    if (result.customTerms.length > 0) {
+        const matchedIngredients: Ingredient[] = []
+        
+        for (const term of result.customTerms) {
+            try {
+                // Fetch from our API
+                const res = await fetch(`/api/ingredients/search?q=${encodeURIComponent(term)}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    // If we find a good match (results[0]), add it.
+                    // We only take the first result as the "best guess".
+                    if (data.results && data.results.length > 0) {
+                        const topMatch = data.results[0]
+                        matchedIngredients.push(topMatch)
+                    }
+                }
+            } catch (err) {
+                console.error("Error matching ingredient:", term, err)
+            }
+        }
+
+        // Set custom avoidance list
+        setCustomAvoidance(matchedIngredients)
+    } else {
+        // If no custom terms, clear the list (part of the "reset" requirement)
+        setCustomAvoidance([])
+    }
+    
+    setIsAnalyzing(false)
+  }
 
   useEffect(() => {
     let mounted = true
@@ -178,6 +230,35 @@ export default function ProfilePage() {
                 placeholder="How should we address you?" 
                 className="max-w-md"
               />
+            </div>
+
+            <div className="h-px bg-border my-6" />
+
+             {/* AI Builder Section */}
+             <div className="space-y-4 bg-primary/5 p-6 rounded-xl border border-primary/10">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    <h2 className="text-lg font-semibold text-primary">Nutrition Intelligence Builder</h2>
+                </div>
+                <p className="text-sm text-foreground/80">
+                    Describe your needs in plain English, and we'll build your profile automatically.
+                </p>
+                <div className="space-y-3">
+                    <Textarea 
+                        value={bioInput}
+                        onChange={(e) => setBioInput(e.target.value)}
+                        placeholder='e.g., "I am a vegan with a severe peanut allergy. I also try to avoid gluten and high sugar foods because of a family history of diabetes."'
+                        className="bg-background min-h-[100px]"
+                    />
+                    <Button 
+                        onClick={handleAnalyzeBio} 
+                        disabled={!bioInput || isAnalyzing}
+                        variant="secondary"
+                        className="w-full sm:w-auto"
+                    >
+                        {isAnalyzing ? "Analyzing..." : "Auto-Fill Profile ✨"}
+                    </Button>
+                </div>
             </div>
 
             <div className="h-px bg-border my-6" />

@@ -7,7 +7,7 @@ import { DemoSection } from "@/components/sections/DemoSection"
 import { FAQSection } from "@/components/sections/FAQSection"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { ChevronRight, User, ScanLine, Camera, Keyboard, Shield, Bell, CheckCircle2 } from "lucide-react"
+import { ChevronRight, User, ScanLine, Camera, Keyboard, Shield, Bell, CheckCircle2, Sparkles, ArrowDown } from "lucide-react"
 
 export default function PersonalPage() {
   return (
@@ -369,6 +369,86 @@ export default function PersonalPage() {
       </section>
 
       <DemoSection />
+      
+      {/* Feature Spotlight: Natural Language Intelligence */}
+      <section className="py-24 bg-primary/5 border-y border-primary/10">
+        <div className="container mx-auto px-6">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+                <div>
+                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+                      <Sparkles className="w-4 h-4" />
+                      Nutrition Intelligence
+                   </div>
+                   <h2 className="text-3xl lg:text-4xl font-bold mb-6 text-balance">
+                      Just say: <br/>
+                      <span className="text-primary">"I'm vegan and allergic to peanuts."</span>
+                   </h2>
+                   <p className="text-lg text-muted-foreground leading-relaxed mb-8">
+                      No more endless checkboxes. Our AI understands your health profile in plain English. 
+                      Whether you have complex medical conditions or simple lifestyle choices, just type it out.
+                   </p>
+                   <div className="flex flex-col gap-4">
+                      <div className="flex items-start gap-4 p-4 bg-background rounded-xl border border-border shadow-sm">
+                          <div className="bg-chart-3/10 p-2 rounded-lg text-chart-3 mt-1">
+                              <CheckCircle2 className="w-5 h-5" />
+                          </div>
+                          <div>
+                              <div className="font-semibold text-foreground">Smart Parsing</div>
+                              <div className="text-sm text-muted-foreground">Instantly maps "high blood pressure" to "Low Sodium" logic.</div>
+                          </div>
+                      </div>
+                      <div className="flex items-start gap-4 p-4 bg-background rounded-xl border border-border shadow-sm">
+                          <div className="bg-accent/10 p-2 rounded-lg text-accent mt-1">
+                              <Shield className="w-5 h-5" />
+                          </div>
+                          <div>
+                              <div className="font-semibold text-foreground">Conflict Resolution</div>
+                              <div className="text-sm text-muted-foreground">Automatically handles overlapping diet rules (e.g. Jain vs Vegan).</div>
+                          </div>
+                      </div>
+                   </div>
+                </div>
+                
+                {/* Visual Demo */}
+                <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-accent/20 rounded-3xl blur-3xl transform rotate-3 scale-95" />
+                    <div className="relative bg-card border border-border rounded-2xl shadow-2xl p-6 lg:p-10 space-y-6">
+                        {/* Input State */}
+                        <div className="space-y-2">
+                            <div className="text-xs font-medium text-muted-foreground uppercase">You Type</div>
+                            <div className="p-4 rounded-xl bg-background border border-primary/30 text-foreground font-medium shadow-sm">
+                                "I follow a <span className="text-primary bg-primary/10 px-1 rounded">Keto</span> diet but I absolutely cannot have <span className="text-destructive bg-destructive/10 px-1 rounded">Dairy</span> or <span className="text-destructive bg-destructive/10 px-1 rounded">Soy</span>."
+                            </div>
+                        </div>
+
+                        {/* Arrow */}
+                        <div className="flex justify-center text-muted-foreground">
+                            <ArrowDown className="w-6 h-6 animate-bounce" />
+                        </div>
+
+                        {/* Result State */}
+                        <div className="space-y-2">
+                             <div className="text-xs font-medium text-muted-foreground uppercase">We Build</div>
+                             <div className="grid gap-3">
+                                <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                                    <span className="text-sm font-medium">Dietary Type</span>
+                                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full border border-primary/20">Keto</span>
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                                    <span className="text-sm font-medium">Allergens</span>
+                                    <div className="flex gap-2">
+                                        <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full border border-destructive/20">Dairy</span>
+                                        <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full border border-destructive/20">Soy</span>
+                                    </div>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </section>
+
       <ForYouSection />
       <FAQSection /> {/* Reusing FAQ Section */}
       
