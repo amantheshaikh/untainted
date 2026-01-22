@@ -6,11 +6,11 @@ export default function HowItWorksPage() {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen pt-24 pb-16 bg-background">
+      <main className="min-h-screen pt-32 pb-16 bg-background">
         <div className="container max-w-6xl mx-auto px-6">
           
           {/* Hero Section */}
-          <div className="text-center mb-24">
+          <div className="text-center mb-10">
              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 mb-6">
                 <Database className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium text-primary">The Food Intelligence Engine</span>

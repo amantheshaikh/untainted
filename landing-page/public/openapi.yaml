@@ -11,21 +11,38 @@ info:
 
     ---
 
-    ## Authentication & Environments
-    
-    The Untainted API uses API keys to authenticate requests. You can view and manage your API keys in the [Untainted Dashboard](https://untainted.io/dashboard).
+    ## Authentication
 
-    We provide two environments:
-    
+    Untainted offers two secure ways to authenticate, depending on your integration model.
+
+    ### 1. Environments & Base URLs
     | Environment | Base URL | Key Prefix | Purpose |
     | :--- | :--- | :--- | :--- |
     | **Production** | `https://api.untainted.io` | `sk_live_...` | Real requests. Logs are permanent. Billable. |
-    | **Sandbox** | `https://api.untainted.io` | `sk_test_...` | Testing and development. Mock data may be used. logic is identical to prod. |
+    | **Sandbox** | `https://api.untainted.io` | `sk_test_...` | Testing and development. Identical logic. |
 
-    **To authenticate**, include your key in the `x-api-key` header of every request:
+    ### 2. Method A: API Keys (Server-Side)
+    Best for backend scripts, cron jobs, or internal tools where no specific user context is needed or you are managing user IDs yourself.
 
+    Include your key in the header:
     ```bash
     curl -H "x-api-key: sk_live_123456" https://api.untainted.io/healthz
+    ```
+
+    ### 3. Method B: OAuth 2.0 (User Context)
+    **Recommended for Platforms.** Securely access a user's Untainted profile without handling their credentials. We follow the standard **Authorization Code Flow with PKCE**.
+
+    **The Flow:**
+
+    1.  **Authorize**: Redirect user to `https://untainted.io/oauth/authorize` with `response_type=code`, `scope=read:profile analyze:product`, and `code_challenge`.
+    2.  **Consent**: User logs in and approves access.
+    3.  **Callback**: We redirect to your `redirect_uri` with a temporary `code`.
+    4.  **Token Exchange**: POST to `/oauth/token` to swap the code for an `access_token`.
+    5.  **Access**: Use the token to make personalized queries.
+
+    ```bash
+    # Example Authorized Request
+    curl -H "Authorization: Bearer <access_token>" https://api.untainted.io/analyze
     ```
 
     ---
@@ -67,6 +84,17 @@ components:
       type: apiKey
       in: header
       name: x-api-key
+
+    OAuth2:
+      type: oauth2
+      description: For accessing user-specific data (e.g. /analyze with user context), use standard Authorization Code flow.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://untainted.io/oauth/authorize
+          tokenUrl: https://api.untainted.io/oauth/token
+          scopes:
+            read:profile: Read user preferences and health profile
+            analyze:product: Perform safety checks against user profile
 
 
   schemas:
@@ -183,6 +211,35 @@ components:
         confidence:
           type: number
 
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT Access Token.
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          example: 3600
+        refresh_token:
+          type: string
+          description: Long-lived token to rotate access tokens.
+        scope:
+          type: string
+          example: "read:profile analyze:product"
+
+    OAuthError:
+      type: object
+      properties:
+        error:
+          type: string
+          enum: [invalid_request, invalid_client, invalid_grant, unauthorized_client, unsupported_grant_type, invalid_scope]
+        error_description:
+          type: string
+          example: "The authorization code has expired."
+
     AnalyzeRequest:
       type: object
       required:
@@ -261,8 +318,11 @@ components:
 
 security:
   - ApiKeyAuth: []
+  - OAuth2: [read:profile, analyze:product]
 
 tags:
+  - name: Authentication
+    description: OAuth 2.0 Token Management
   - name: Analysis
     description: Core safety checks
   - name: Products
@@ -273,6 +333,64 @@ tags:
     description: Health and status
 
 paths:
+  /oauth/token:
+    post:
+      summary: Get Access Token
+      tags:
+        - Authentication
+      description: |
+        Exchange an Authorization Code for an Access Token (and Refresh Token).
+        Supports **PKCE** for public clients and standard Basic Auth for confidential clients.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - grant_type
+                - code
+                - redirect_uri
+              properties:
+                grant_type:
+                  type: string
+                  enum: [authorization_code, refresh_token]
+                code:
+                  type: string
+                  description: The short-lived code received in the callback.
+                redirect_uri:
+                  type: string
+                  description: Must match the URI used in the authorize request.
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+                code_verifier:
+                  type: string
+                  description: Required for PKCE flow.
+                refresh_token:
+                  type: string
+                  description: Required if grant_type is refresh_token.
+      responses:
+        '200':
+          description: Successful Token Exchange
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Bad Request (Invalid code, missing parameters)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+        '401':
+          description: Unauthorized (Invalid client credentials)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+
   /analyze:
     post:
       summary: Check Product Safety

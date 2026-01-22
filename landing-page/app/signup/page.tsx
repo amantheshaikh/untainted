@@ -15,6 +15,7 @@ export default function SignUpPage() {
   const [accountType, setAccountType] = useState<"personal" | "business" | null>(null)
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("+91 ")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -46,7 +47,8 @@ export default function SignUpPage() {
       password,
       options: {
         data: {
-          full_name: name
+          full_name: name,
+          phone: phone // Store in metadata as backup
         }
       }
     })
@@ -64,7 +66,8 @@ export default function SignUpPage() {
         // We'll trust the trigger or subsequent profile load, but updating here ensures immediate availability
         await supabase.from("profiles").upsert({
             user_id: authData.user.id,
-            name: name
+            name: name,
+            phone: phone
         })
     }
 
@@ -224,6 +227,18 @@ export default function SignUpPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="john@example.com"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Mobile Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+91 98765 43210"
                     required
                   />
                 </div>

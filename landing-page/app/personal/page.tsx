@@ -9,13 +9,42 @@ import Link from "next/link"
 import { motion } from "framer-motion"
 import { ChevronRight, User, ScanLine, Camera, Keyboard, Shield, Bell, CheckCircle2, Sparkles, ArrowDown } from "lucide-react"
 
+import { useState } from "react"
+import { supabase } from "@/lib/supabaseClient"
+
 export default function PersonalPage() {
+  const [email, setEmail] = useState("")
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+
+  const handleJoinWaitlist = async () => {
+    if (!email || !email.includes("@")) return
+    
+    setStatus('loading')
+    
+    // Check if email already exists to prevent duplicate errors if table has unique constraint
+    // Or just let insert fail/succeed. Let's try insert.
+    const { error } = await supabase.from("waitlist").insert([{ email, source: 'personal_page' }])
+    
+    if (error) {
+        // If error code is unique violation (23505), treat as success (user already registered)
+        if (error.code === '23505') {
+            setStatus('success')
+        } else {
+            console.error(error)
+            setStatus('error')
+        }
+    } else {
+        setStatus('success')
+        setEmail("")
+    }
+  }
+
   return (
     <main className="min-h-screen bg-background pt-20">
       <Navbar />
       
       {/* Hero Section */}
-      <section className="relative px-6 lg:px-8 py-20 lg:py-32">
+      <section className="relative px-6 lg:px-8 py-10 lg:py-10">
         <div className="max-w-7xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -42,14 +71,30 @@ export default function PersonalPage() {
 
                 {/* Waitlist Input */}
                 <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto mb-12">
-                   <input
-                     type="email"
-                     placeholder="Enter your email for early access"
-                     className="flex-1 px-5 py-3 rounded-full border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                   />
-                   <button className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity whitespace-nowrap">
-                     Join Waitlist
-                   </button>
+                   {status === 'success' ? (
+                       <div className="flex-1 bg-primary/10 text-primary border border-primary/20 px-5 py-3 rounded-full text-center font-medium animate-in fade-in zoom-in duration-300">
+                           🎉 You're on the list! We'll be in touch.
+                       </div>
+                   ) : (
+                       <>
+                           <input
+                             type="email"
+                             value={email}
+                             onChange={(e) => setEmail(e.target.value)}
+                             placeholder="Enter your email for early access"
+                             className="flex-1 px-5 py-3 rounded-full border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                             disabled={status === 'loading'}
+                             onKeyDown={(e) => e.key === 'Enter' && handleJoinWaitlist()}
+                           />
+                           <button 
+                             onClick={handleJoinWaitlist}
+                             disabled={status === 'loading' || !email}
+                             className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                           >
+                             {status === 'loading' ? 'Joining...' : 'Join Waitlist'}
+                           </button>
+                       </>
+                   )}
                 </div>
                  <p className="text-xs text-muted-foreground">We'll notify you when iOS & Android apps launch.</p>
             </motion.div>
