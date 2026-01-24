@@ -40,8 +40,14 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
     }
 
     const startCamera = async () => {
+        // Prevent multiple simultaneous starts
+        if (isStarting || isCameraOpen) {
+            console.log("Camera already starting or open, ignoring request")
+            return
+        }
+
+        setIsStarting(true)
         setCameraError(null)
-        setIsCameraOpen(true)
 
         // Calculate responsive qrbox size
         const calculatedSize = getQrBoxSize()
@@ -51,6 +57,18 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
         await new Promise(r => setTimeout(r, 100))
 
         try {
+            // Clean up any existing scanner first
+            if (scannerRef.current) {
+                try {
+                    if (scannerRef.current.isScanning) {
+                        await scannerRef.current.stop()
+                    }
+                    scannerRef.current.clear()
+                } catch (err) {
+                    console.log("Error cleaning up previous scanner:", err)
+                }
+                scannerRef.current = null
+            }
             // Prioritize Barcode formats for speed
             const html5QrCode = new Html5Qrcode(scannerId, {
                 formatsToSupport: [
@@ -87,6 +105,7 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
                         // Error callback (ignore frequent scan errors)
                     }
                 )
+                setIsCameraOpen(true)
             } catch (envError) {
                 // Fallback to any available camera
                 console.log("Environment camera failed, trying any camera:", envError)
@@ -102,6 +121,7 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
                         // Error callback (ignore frequent scan errors)
                     }
                 )
+                setIsCameraOpen(true)
             }
         } catch (err: any) {
             console.error("Camera error:", err)
