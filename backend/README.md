@@ -72,3 +72,4 @@ For other platforms (Railway, Fly.io, ECS), use the same container image, expose
 - Stop the uvicorn/Docker processes when finished.
 - Deactivate the Python virtual environment with `deactivate`.
 - Remove the Docker image if no longer needed: `docker rmi clean-food-backend`.
+ 
