@@ -178,7 +178,7 @@ def extract_ingredients_fast(image_parts: List[Dict[str, Any]]) -> str:
     model = genai.GenerativeModel(
         GEMINI_MODEL,
         generation_config=genai.GenerationConfig(
-            max_output_tokens=1024,  # Ingredients rarely exceed this
+            max_output_tokens=32768,  # Ingredients rarely exceed this
             temperature=0.1,  # Low temperature for accurate transcription
         )
     )

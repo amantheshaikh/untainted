@@ -1179,6 +1179,10 @@ DIET_FALLBACK_TOKENS: Dict[str, Set[str]] = {
         "beef",
         "chicken",
         "duck",
+        "egg",
+        "egg white",
+        "egg yolk",
+        "eggs",
         "fish",
         "goat",
         "ham",
@@ -1193,6 +1197,7 @@ DIET_FALLBACK_TOKENS: Dict[str, Set[str]] = {
         "shellfish",
         "shrimp",
         "turkey",
+        "whole egg",
     },
     "vegan": {
         "butter",
@@ -1484,6 +1489,7 @@ def _build_diet_rules() -> Dict[str, Dict[str, Set[str]]]:
             "en:lard",
             "en:animal-fat",
             "en:animal-enzymes",
+            "en:egg",
         ],
         "vegan": [
             "en:meat",

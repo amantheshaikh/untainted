@@ -17,33 +17,33 @@ type Profile = {
     profile_json?: any
 }
 
-// Full list of options derived from landing page analysis
+// Full list of options with descriptions
 const DIETARY_PREFERENCES = [
-    "Vegan",
-    "Vegetarian",
-    "Jain",
-    "Sattvic",
-    "Keto",
-    "Paleo",
+    { name: "Vegan", description: "No animal products including meat, dairy, eggs, or honey" },
+    { name: "Vegetarian", description: "No meat, fish, or eggs; may include dairy" },
+    { name: "Jain", description: "Vegetarian plus no root vegetables like onions, garlic, potatoes" },
+    { name: "Sattvic", description: "Pure vegetarian with no onion, garlic, or stimulants" },
+    { name: "Keto", description: "Very low carb, high fat diet to maintain ketosis" },
+    { name: "Paleo", description: "Whole foods only; no grains, legumes, or processed foods" },
 ]
 
 const HEALTH_RESTRICTIONS = [
-    "Clean Eating",
-    "Diabetic-Friendly",
-    "Low FODMAP",
-    "No Maida",
-    "No Onion-Garlic",
+    { name: "Clean Eating", description: "Avoid artificial additives, preservatives, and processed ingredients" },
+    { name: "Diabetic-Friendly", description: "Low glycemic foods with limited sugar and refined carbs" },
+    { name: "Low FODMAP", description: "Avoids fermentable carbs that can cause digestive issues" },
+    { name: "No Maida", description: "Avoids refined white flour (all-purpose flour)" },
+    { name: "No Onion-Garlic", description: "Excludes alliums; common in Jain and Ayurvedic diets" },
 ]
 
 const ALLERGIES = [
-    "Gluten",
-    "Dairy",
-    "Nut",
-    "Soy",
-    "Egg",
-    "Shellfish",
-    "Fish",
-    "Sesame",
+    { name: "Gluten", description: "Protein found in wheat, barley, and rye" },
+    { name: "Dairy", description: "Milk and milk-derived products" },
+    { name: "Nut", description: "Tree nuts like almonds, cashews, walnuts" },
+    { name: "Soy", description: "Soybeans and soy-derived ingredients" },
+    { name: "Egg", description: "Eggs and egg-derived ingredients" },
+    { name: "Shellfish", description: "Shrimp, crab, lobster, and similar" },
+    { name: "Fish", description: "All fish and fish-derived products" },
+    { name: "Sesame", description: "Sesame seeds and sesame oil" },
 ]
 
 export function ProfileTab() {
@@ -247,15 +247,19 @@ export function ProfileTab() {
                     <span className="text-xl">🥗</span>
                     <h2 className="text-lg font-semibold">Dietary Preferences</h2>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {DIETARY_PREFERENCES.map((pref) => (
-                        <div key={pref} className="flex items-center space-x-3 p-3 rounded-lg border border-transparent hover:bg-secondary/50 transition-colors">
+                        <div key={pref.name} className="flex items-start space-x-3 p-3 rounded-lg border border-border/50 hover:bg-secondary/50 hover:border-primary/20 transition-colors">
                             <Checkbox
-                                id={`diet-${pref}`}
-                                checked={selectedDiets.includes(pref)}
-                                onCheckedChange={() => toggleSelection(pref, selectedDiets, setSelectedDiets)}
+                                id={`diet-${pref.name}`}
+                                checked={selectedDiets.includes(pref.name)}
+                                onCheckedChange={() => toggleSelection(pref.name, selectedDiets, setSelectedDiets)}
+                                className="mt-0.5"
                             />
-                            <Label htmlFor={`diet-${pref}`} className="font-normal cursor-pointer flex-1">{pref}</Label>
+                            <Label htmlFor={`diet-${pref.name}`} className="font-normal cursor-pointer flex-1 space-y-1">
+                                <span className="font-medium block">{pref.name}</span>
+                                <span className="text-xs text-muted-foreground block">{pref.description}</span>
+                            </Label>
                         </div>
                     ))}
                 </div>
@@ -269,15 +273,19 @@ export function ProfileTab() {
                     <span className="text-xl">❤️</span>
                     <h2 className="text-lg font-semibold">Health Goals & Restrictions</h2>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {HEALTH_RESTRICTIONS.map((res) => (
-                        <div key={res} className="flex items-center space-x-3 p-3 rounded-lg border border-transparent hover:bg-secondary/50 transition-colors">
+                        <div key={res.name} className="flex items-start space-x-3 p-3 rounded-lg border border-border/50 hover:bg-secondary/50 hover:border-primary/20 transition-colors">
                             <Checkbox
-                                id={`health-${res}`}
-                                checked={selectedHealth.includes(res)}
-                                onCheckedChange={() => toggleSelection(res, selectedHealth, setSelectedHealth)}
+                                id={`health-${res.name}`}
+                                checked={selectedHealth.includes(res.name)}
+                                onCheckedChange={() => toggleSelection(res.name, selectedHealth, setSelectedHealth)}
+                                className="mt-0.5"
                             />
-                            <Label htmlFor={`health-${res}`} className="font-normal cursor-pointer flex-1">{res}</Label>
+                            <Label htmlFor={`health-${res.name}`} className="font-normal cursor-pointer flex-1 space-y-1">
+                                <span className="font-medium block">{res.name}</span>
+                                <span className="text-xs text-muted-foreground block">{res.description}</span>
+                            </Label>
                         </div>
                     ))}
                 </div>
@@ -292,15 +300,19 @@ export function ProfileTab() {
                     <h2 className="text-lg font-semibold">Allergies & Sensitivities</h2>
                 </div>
                 <p className="text-sm text-muted-foreground">Ingredients you absolutely need to avoid.</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {ALLERGIES.map((allergy) => (
-                        <div key={allergy} className="flex items-center space-x-3 p-3 rounded-lg border border-transparent hover:bg-secondary/50 transition-colors">
+                        <div key={allergy.name} className="flex items-start space-x-3 p-3 rounded-lg border border-border/50 hover:bg-secondary/50 hover:border-primary/20 transition-colors">
                             <Checkbox
-                                id={`allergy-${allergy}`}
-                                checked={selectedAllergies.includes(allergy)}
-                                onCheckedChange={() => toggleSelection(allergy, selectedAllergies, setSelectedAllergies)}
+                                id={`allergy-${allergy.name}`}
+                                checked={selectedAllergies.includes(allergy.name)}
+                                onCheckedChange={() => toggleSelection(allergy.name, selectedAllergies, setSelectedAllergies)}
+                                className="mt-0.5"
                             />
-                            <Label htmlFor={`allergy-${allergy}`} className="font-normal cursor-pointer flex-1">{allergy}</Label>
+                            <Label htmlFor={`allergy-${allergy.name}`} className="font-normal cursor-pointer flex-1 space-y-1">
+                                <span className="font-medium block">{allergy.name}</span>
+                                <span className="text-xs text-muted-foreground block">{allergy.description}</span>
+                            </Label>
                         </div>
                     ))}
                 </div>
