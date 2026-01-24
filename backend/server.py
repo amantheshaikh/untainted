@@ -262,10 +262,60 @@ if not OFF_ADDITIVES_PATH:
 
 # --- Utility helpers -----------------------------------------------------
 
+def normalize_additive_code(text: str) -> str:
+    """
+    Normalize additive codes to E-number format.
+    
+    Converts INS codes to E-numbers and handles sub-classifications.
+    Examples:
+        - "INS 500" -> "e500"
+        - "INS 500 (ii)" -> "e500(ii)"
+        - "INS 500(ii)" -> "e500(ii)"
+        - "E 500 (ii)" -> "e500(ii)"
+        - "e500 (ii)" -> "e500(ii)"
+    
+    Args:
+        text: Input text that may contain additive codes
+        
+    Returns:
+        Normalized text with E-number format
+    """
+    # Pattern to match INS/E codes with optional spaces and sub-classifications
+    # Matches: INS 500, INS 500(ii), INS 500 (ii), E500, E 500, E500(ii), E 500 (ii), etc.
+    pattern = r'\b(?:INS|E)\s*(\d+)\s*(\([ivx]+\))?'
+    
+    def replace_code(match):
+        number = match.group(1)
+        subclass = match.group(2) if match.group(2) else ""
+        # Remove spaces from sub-classification if present
+        subclass = subclass.replace(" ", "")
+        return f"e{number}{subclass}"
+    
+    # Apply the replacement
+    result = re.sub(pattern, replace_code, text, flags=re.IGNORECASE)
+    return result
+
+
 def normalize_token(text: str) -> str:
+    """
+    Normalize text for matching, preserving E-number sub-classifications.
+    
+    Keeps parentheses for E-number codes (e.g., e500(ii)) but removes them elsewhere.
+    """
     text = text.strip().lower()
     text = re.sub(r"[\u2010\u2011\u2012\u2013\u2014]", "-", text)
-    text = re.sub(r"[^a-z0-9+\-\s]", " ", text)
+    
+    # Check if this looks like an E-number with sub-classification
+    # Pattern: e followed by digits, optionally followed by (roman numerals)
+    is_enumber = re.match(r'^e\d+(\([ivx]+\))?$', text)
+    
+    if is_enumber:
+        # For E-numbers, only remove spaces but keep parentheses
+        text = re.sub(r"[^a-z0-9()\-]", "", text)
+    else:
+        # For everything else, remove all special characters including parentheses
+        text = re.sub(r"[^a-z0-9+\-\s]", " ", text)
+    
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
@@ -678,8 +728,32 @@ class IngredientNormalizer:
                 continue
             for pattern, replacement in SPECIAL_TOKEN_REPLACEMENTS:
                 segment = pattern.sub(replacement, segment)
-            # Replace parentheses with commas to flatten nested list structure
+            
+            # Step 1: Normalize additive codes (INS -> E, handle spaces in sub-classifications)
+            # This must happen BEFORE we flatten parentheses
+            segment = normalize_additive_code(segment)
+            
+            # Step 2: Remove percentage indicators (e.g., "96%", "17.5%")
+            # These indicate ingredient contribution but don't affect matching
+            segment = re.sub(r'\d+(?:\.\d+)?\s*%', '', segment)
+            
+            # Step 3: Replace parentheses with commas to flatten nested list structure
+            # BUT preserve E-number sub-classifications (already normalized in step 1)
+            # We need to protect E-numbers before flattening
+            enumber_pattern = r'\be\d+\([ivx]+\)'
+            enumbers = re.findall(enumber_pattern, segment, re.IGNORECASE)
+            
+            # Temporarily replace E-numbers with placeholders
+            for i, enumber in enumerate(enumbers):
+                segment = segment.replace(enumber, f"__ENUMBER_{i}__", 1)
+            
+            # Now safe to flatten parentheses
             segment = segment.replace("(", ", ").replace(")", "")
+            
+            # Restore E-numbers
+            for i, enumber in enumerate(enumbers):
+                segment = segment.replace(f"__ENUMBER_{i}__", enumber)
+            
             segment = re.sub(r"\[[^]]*\]", " ", segment)
             segment = re.sub(r"\s+", " ", segment).strip()
             if not segment:

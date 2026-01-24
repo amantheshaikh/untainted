@@ -17,6 +17,7 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
     const [cameraError, setCameraError] = useState<string | null>(null)
     const scannerRef = useRef<Html5Qrcode | null>(null)
     const [scannerId] = useState("reader-" + Math.random().toString(36).substring(7))
+    const [qrBoxSize, setQrBoxSize] = useState({ width: 300, height: 150 })
 
     useEffect(() => {
         // Cleanup on unmount
@@ -30,9 +31,20 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
         }
     }, [])
 
+    const getQrBoxSize = () => {
+        // Make scanning box responsive to screen size
+        const width = Math.min(window.innerWidth * 0.8, 300)
+        const height = Math.min(width * 0.5, 150)
+        return { width: Math.floor(width), height: Math.floor(height) }
+    }
+
     const startCamera = async () => {
         setCameraError(null)
         setIsCameraOpen(true)
+
+        // Calculate responsive qrbox size
+        const calculatedSize = getQrBoxSize()
+        setQrBoxSize(calculatedSize)
 
         // Wait for DOM
         await new Promise(r => setTimeout(r, 100))
@@ -51,30 +63,62 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
             })
             scannerRef.current = html5QrCode
 
-            // Rectangular scanning region for barcodes
+            // Responsive scanning configuration
             const config = {
                 fps: 10,
-                qrbox: { width: 300, height: 150 }, // Rectangular box
-                aspectRatio: 1.0,
+                qrbox: calculatedSize,
+                // Remove fixed aspectRatio to allow camera's native ratio
                 disableFlip: false,
             }
 
-            await html5QrCode.start(
-                { facingMode: "environment" },
-                config,
-                (decodedText) => {
-                    // Success callback
-                    console.log(`Scan success: ${decodedText}`)
-                    stopCamera()
-                    onProductFound(decodedText)
-                },
-                (errorMessage) => {
-                    // Error callback (ignore frequent scan errors)
-                }
-            )
+            // Try environment camera first (back camera on mobile)
+            try {
+                await html5QrCode.start(
+                    { facingMode: { ideal: "environment" } },
+                    config,
+                    (decodedText) => {
+                        // Success callback
+                        console.log(`Scan success: ${decodedText}`)
+                        stopCamera()
+                        onProductFound(decodedText)
+                    },
+                    (errorMessage) => {
+                        // Error callback (ignore frequent scan errors)
+                    }
+                )
+            } catch (envError) {
+                // Fallback to any available camera
+                console.log("Environment camera failed, trying any camera:", envError)
+                await html5QrCode.start(
+                    { facingMode: "user" },
+                    config,
+                    (decodedText) => {
+                        console.log(`Scan success: ${decodedText}`)
+                        stopCamera()
+                        onProductFound(decodedText)
+                    },
+                    (errorMessage) => {
+                        // Error callback (ignore frequent scan errors)
+                    }
+                )
+            }
         } catch (err: any) {
-            console.error(err)
-            setCameraError(err.message || "Could not access camera.")
+            console.error("Camera error:", err)
+
+            // Provide specific error messages
+            let errorMessage = "Could not access camera."
+
+            if (err.name === "NotAllowedError" || err.message?.includes("Permission")) {
+                errorMessage = "Camera permission denied. Please allow camera access in your browser settings."
+            } else if (err.name === "NotFoundError" || err.message?.includes("not found")) {
+                errorMessage = "No camera found on this device."
+            } else if (err.name === "NotReadableError" || err.message?.includes("in use")) {
+                errorMessage = "Camera is already in use by another application."
+            } else if (err.message) {
+                errorMessage = err.message
+            }
+
+            setCameraError(errorMessage)
             setIsCameraOpen(false)
         }
     }
@@ -133,7 +177,10 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
                     {/* Creative Overlay for Rectangular Barcode */}
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                         {/* Using a centered box instead of full borders to emphasize the scan area */}
-                        <div className="w-[300px] h-[150px] border-2 border-red-500/80 rounded-lg relative shadow-[0_0_20px_rgba(239,68,68,0.5)]">
+                        <div
+                            className="border-2 border-red-500/80 rounded-lg relative shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+                            style={{ width: `${qrBoxSize.width}px`, height: `${qrBoxSize.height}px` }}
+                        >
                             <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500/50 animate-pulse"></div>
                         </div>
                     </div>
