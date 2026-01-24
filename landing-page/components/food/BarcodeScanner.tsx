@@ -53,21 +53,27 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
         const calculatedSize = getQrBoxSize()
         setQrBoxSize(calculatedSize)
 
-        // Wait for DOM
-        await new Promise(r => setTimeout(r, 100))
+        // Wait for DOM to be ready
+        await new Promise(r => setTimeout(r, 150))
 
         try {
-            // Clean up any existing scanner first
+            // Clean up any existing scanner first (stop but don't clear DOM)
             if (scannerRef.current) {
                 try {
                     if (scannerRef.current.isScanning) {
                         await scannerRef.current.stop()
                     }
-                    scannerRef.current.clear()
+                    // Don't call clear() as it removes the DOM element
                 } catch (err) {
-                    console.log("Error cleaning up previous scanner:", err)
+                    console.log("Error stopping previous scanner:", err)
                 }
                 scannerRef.current = null
+            }
+
+            // Verify DOM element exists
+            const element = document.getElementById(scannerId)
+            if (!element) {
+                throw new Error(`Scanner element ${scannerId} not found in DOM`)
             }
             // Prioritize Barcode formats for speed
             const html5QrCode = new Html5Qrcode(scannerId, {
@@ -150,10 +156,12 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
                 if (scannerRef.current.isScanning) {
                     await scannerRef.current.stop()
                 }
-                scannerRef.current.clear()
+                // Don't call clear() - it removes the DOM element
+                // Just set ref to null so we can create a new scanner instance
             } catch (err) {
                 console.error("Failed to stop scanner", err)
             }
+            scannerRef.current = null
         }
         setIsCameraOpen(false)
     }
