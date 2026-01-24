@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Camera, AlertCircle, X, ScanBarcode } from "lucide-react"
+import { Search, Camera, X, ScanBarcode } from "lucide-react"
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode"
 
 interface BarcodeScannerProps {
@@ -11,14 +11,29 @@ interface BarcodeScannerProps {
     isSearching: boolean
 }
 
+// Camera state machine to handle transitions properly
+type CameraState = "idle" | "starting" | "running" | "stopping"
+
 export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerProps) {
     const [barcode, setBarcode] = useState("")
-    const [isCameraOpen, setIsCameraOpen] = useState(false)
-    const [isStarting, setIsStarting] = useState(false) // Prevent race conditions
+    const [cameraState, setCameraState] = useState<CameraState>("idle")
+    const cameraStateRef = useRef<CameraState>("idle") // Ref to track current state for closures
     const [cameraError, setCameraError] = useState<string | null>(null)
     const scannerRef = useRef<Html5Qrcode | null>(null)
+    const abortStartupRef = useRef(false) // Track if startup should be aborted
+    const lastStopTimeRef = useRef<number>(0) // Track when camera was last stopped for cooldown
     const [scannerId] = useState("reader-" + Math.random().toString(36).substring(7))
     const [qrBoxSize, setQrBoxSize] = useState({ width: 300, height: 150 })
+
+    // Derived state for backward compatibility
+    const isCameraOpen = cameraState === "starting" || cameraState === "running"
+    const isStarting = cameraState === "starting"
+
+    // Helper to update both state and ref
+    const updateCameraState = (newState: CameraState) => {
+        cameraStateRef.current = newState
+        setCameraState(newState)
+    }
 
     useEffect(() => {
         // Cleanup on unmount
@@ -40,21 +55,35 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
     }
 
     const startCamera = async () => {
-        // Prevent multiple simultaneous starts
-        if (isStarting || isCameraOpen) {
-            console.log("Camera already starting or open, ignoring request")
+        // Only allow starting from idle state (use ref for accurate check)
+        if (cameraStateRef.current !== "idle") {
+            console.log(`Camera in ${cameraStateRef.current} state, ignoring start request`)
             return
         }
 
-        setIsStarting(true)
+        updateCameraState("starting")
         setCameraError(null)
+        abortStartupRef.current = false
 
         // Calculate responsive qrbox size
         const calculatedSize = getQrBoxSize()
         setQrBoxSize(calculatedSize)
 
-        // Wait for DOM to be ready
-        await new Promise(r => setTimeout(r, 150))
+        // Wait for DOM element to be rendered (React state update + render)
+        await new Promise(r => setTimeout(r, 200))
+
+        // Ensure minimum cooldown after last stop to let html5-qrcode finish internal cleanup
+        const timeSinceLastStop = Date.now() - lastStopTimeRef.current
+        const cooldownMs = 500
+        if (timeSinceLastStop < cooldownMs) {
+            await new Promise(r => setTimeout(r, cooldownMs - timeSinceLastStop))
+        }
+
+        // Check if startup was aborted during the wait
+        if (abortStartupRef.current) {
+            console.log("Startup aborted during DOM wait")
+            return
+        }
 
         try {
             // Clean up any existing scanner first (stop but don't clear DOM)
@@ -62,6 +91,8 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
                 try {
                     if (scannerRef.current.isScanning) {
                         await scannerRef.current.stop()
+                        // Wait for library to finish internal cleanup
+                        await new Promise(r => setTimeout(r, 300))
                     }
                     // Don't call clear() as it removes the DOM element
                 } catch (err) {
@@ -96,39 +127,54 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
                 disableFlip: false,
             }
 
+            const onScanSuccess = (decodedText: string) => {
+                console.log(`Scan success: ${decodedText}`)
+                stopCamera()
+                onProductFound(decodedText)
+            }
+
+            const onScanError = () => {
+                // Error callback (ignore frequent scan errors)
+            }
+
+            // Helper to start camera with retry on transition error
+            const startWithRetry = async (facingMode: any, maxRetries = 3): Promise<boolean> => {
+                for (let attempt = 0; attempt < maxRetries; attempt++) {
+                    try {
+                        await html5QrCode.start(facingMode, config, onScanSuccess, onScanError)
+                        return true
+                    } catch (err: any) {
+                        const isTransitionError = err.message?.includes("transition")
+                        if (isTransitionError && attempt < maxRetries - 1) {
+                            console.log(`Transition error, retrying in 300ms (attempt ${attempt + 1}/${maxRetries})`)
+                            await new Promise(r => setTimeout(r, 300))
+                        } else {
+                            throw err
+                        }
+                    }
+                }
+                return false
+            }
+
             // Try environment camera first (back camera on mobile)
             try {
-                await html5QrCode.start(
-                    { facingMode: { ideal: "environment" } },
-                    config,
-                    (decodedText) => {
-                        // Success callback
-                        console.log(`Scan success: ${decodedText}`)
-                        stopCamera()
-                        onProductFound(decodedText)
-                    },
-                    (errorMessage) => {
-                        // Error callback (ignore frequent scan errors)
-                    }
-                )
-                setIsCameraOpen(true)
+                await startWithRetry({ facingMode: "environment" })
             } catch (envError) {
                 // Fallback to any available camera
                 console.log("Environment camera failed, trying any camera:", envError)
-                await html5QrCode.start(
-                    { facingMode: "user" },
-                    config,
-                    (decodedText) => {
-                        console.log(`Scan success: ${decodedText}`)
-                        stopCamera()
-                        onProductFound(decodedText)
-                    },
-                    (errorMessage) => {
-                        // Error callback (ignore frequent scan errors)
-                    }
-                )
-                setIsCameraOpen(true)
+                await startWithRetry({ facingMode: "user" })
             }
+            // Check if startup was aborted during camera.start()
+            if (abortStartupRef.current) {
+                console.log("Startup aborted, cleaning up")
+                if (scannerRef.current?.isScanning) {
+                    await scannerRef.current.stop().catch(console.error)
+                }
+                scannerRef.current = null
+                return
+            }
+            // Camera successfully started
+            updateCameraState("running")
         } catch (err: any) {
             console.error("Camera error:", err)
 
@@ -141,16 +187,28 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
                 errorMessage = "No camera found on this device."
             } else if (err.name === "NotReadableError" || err.message?.includes("in use")) {
                 errorMessage = "Camera is already in use by another application."
+            } else if (err.message?.includes("transition")) {
+                errorMessage = "Camera is busy. Please try again in a moment."
             } else if (err.message) {
                 errorMessage = err.message
             }
 
             setCameraError(errorMessage)
-            setIsCameraOpen(false)
+            updateCameraState("idle") // Reset on error
         }
     }
 
     const stopCamera = async () => {
+        // Only allow stopping from running or starting state (use ref for accurate check in closures)
+        if (cameraStateRef.current !== "running" && cameraStateRef.current !== "starting") {
+            console.log(`Camera in ${cameraStateRef.current} state, ignoring stop request`)
+            return
+        }
+
+        // Signal any ongoing startup to abort
+        abortStartupRef.current = true
+        updateCameraState("stopping")
+
         if (scannerRef.current) {
             try {
                 if (scannerRef.current.isScanning) {
@@ -163,7 +221,8 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
             }
             scannerRef.current = null
         }
-        setIsCameraOpen(false)
+        lastStopTimeRef.current = Date.now()
+        updateCameraState("idle")
     }
 
     const handleManualSearch = () => {
