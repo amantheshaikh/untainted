@@ -167,6 +167,43 @@ def _normalize_nutrition_keys(data: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
+def extract_ingredients_fast(image_parts: List[Dict[str, Any]]) -> str:
+    """
+    Optimized ingredient extraction - shorter prompt, faster response.
+    Uses generation config to limit output tokens.
+    """
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY not configured")
+
+    model = genai.GenerativeModel(
+        GEMINI_MODEL,
+        generation_config=genai.GenerationConfig(
+            max_output_tokens=1024,  # Ingredients rarely exceed this
+            temperature=0.1,  # Low temperature for accurate transcription
+        )
+    )
+
+    # Shorter, focused prompt
+    prompt = """Extract the ingredients list from this product label image.
+Return ONLY the ingredients text, comma-separated. No "Ingredients:" prefix.
+Include allergen warnings if present (e.g., "Contains: milk").
+If no ingredients found, return empty string."""
+
+    content = [prompt] + list(image_parts)
+
+    try:
+        response = model.generate_content(content, request_options={'timeout': 20})
+        try:
+            return response.text.strip()
+        except ValueError:
+            if response.candidates:
+                print(f"Gemini output blocked. Finish reason: {response.candidates[0].finish_reason}")
+            return ""
+    except Exception as e:
+        print(f"VLM Error: {e}")
+        raise e
+
+
 def extract_ingredients_with_gemini(image_parts: List[Dict[str, Any]]) -> str:
     """
     Uses Gemini to extract ingredients text from images.

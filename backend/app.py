@@ -10,6 +10,7 @@ import time
 from collections import deque, defaultdict
 import io
 from PIL import Image, ImageOps
+from concurrent.futures import ThreadPoolExecutor
 
 import time
 from collections import deque, defaultdict
@@ -585,7 +586,7 @@ class AnalyzeResponse(BaseModel):
     regulatory: Optional[Dict[str, Any]] = None
 
 
-from vlm import extract_ingredients_with_gemini, extract_nutrition_with_gemini, extract_label_with_gemini
+from vlm import extract_ingredients_with_gemini, extract_ingredients_fast, extract_nutrition_with_gemini, extract_label_with_gemini
 from fssai import get_regulatory_summary, generate_nutrition_insights, check_prohibited_ingredients
 
 
@@ -621,82 +622,100 @@ class ExtractIngredientsResponse(BaseModel):
 class ExtractNutritionResponse(BaseModel):
     nutrition_info: Dict[str, Any]
 
-def _decode_base64_images(images: List[str]) -> List[Dict[str, Any]]:
+def _decode_single_image(args: tuple) -> Dict[str, Any]:
+    """
+    Decode a single base64 image. Used for parallel processing.
+    """
+    i, b64, max_dim, quality, size_threshold = args
+    clean_b64 = b64
+    mime_type = "image/jpeg"
+
+    if "," in clean_b64:
+        header, clean_b64 = clean_b64.split(",", 1)
+        if "image/png" in header:
+            mime_type = "image/png"
+        elif "image/webp" in header:
+            mime_type = "image/webp"
+        elif "image/gif" in header:
+            mime_type = "image/gif"
+
+    try:
+        decoded = base64.b64decode(clean_b64)
+        if len(decoded) > MAX_IMAGE_SIZE_BYTES:
+            raise ValueError(f"Image {i+1} exceeds maximum decoded size")
+
+        # Resize if needed
+        try:
+            if len(decoded) > size_threshold:
+                with Image.open(io.BytesIO(decoded)) as img:
+                    # Fix orientation
+                    try:
+                        img = ImageOps.exif_transpose(img)
+                    except Exception:
+                        pass
+
+                    # Resize logic using thumbnail (preserves aspect ratio)
+                    if max(img.size) > max_dim:
+                        # Convert to RGB for JPEG (more efficient for text)
+                        if img.mode in ("RGBA", "P"):
+                            img = img.convert("RGB")
+                        mime_type = "image/jpeg"
+
+                        img.thumbnail((max_dim, max_dim))
+
+                        out_buf = io.BytesIO()
+                        img.save(out_buf, format="JPEG", quality=quality, optimize=True)
+                        decoded = out_buf.getvalue()
+        except Exception as e:
+            logger.warning(f"Image resize failed for image {i}, proceeding with original: {e}")
+
+        return {
+            "mime_type": mime_type,
+            "data": decoded,
+            "index": i
+        }
+    except base64.binascii.Error:
+        raise ValueError(f"Image {i+1} has invalid base64 encoding")
+
+
+def _decode_base64_images(images: List[str], max_dim: int = 1024, quality: int = 85, size_threshold: int = 500 * 1024) -> List[Dict[str, Any]]:
     """
     Decode base64 images with validation and resizing.
     Returns list of image parts ready for Gemini API.
-    Resizes large images to max 1024px to improve VLM speed.
+
+    Args:
+        images: List of base64 encoded images
+        max_dim: Maximum dimension for resizing (default 1024)
+        quality: JPEG quality for compression (default 85)
+        size_threshold: Only resize images larger than this (default 500KB)
     """
-    image_parts = []
-    MAX_DIM = 1024
+    if len(images) == 1:
+        # Single image - no need for thread pool overhead
+        result = _decode_single_image((0, images[0], max_dim, quality, size_threshold))
+        return [{"mime_type": result["mime_type"], "data": result["data"]}]
 
-    for i, b64 in enumerate(images):
-        clean_b64 = b64
-        mime_type = "image/jpeg"
+    # Multiple images - process in parallel
+    args_list = [(i, img, max_dim, quality, size_threshold) for i, img in enumerate(images)]
 
-        if "," in clean_b64:
-            header, clean_b64 = clean_b64.split(",", 1)
-            if "image/png" in header:
-                mime_type = "image/png"
-            elif "image/webp" in header:
-                mime_type = "image/webp"
-            elif "image/gif" in header:
-                mime_type = "image/gif"
+    with ThreadPoolExecutor(max_workers=min(len(images), 4)) as executor:
+        results = list(executor.map(_decode_single_image, args_list))
 
-        try:
-            decoded = base64.b64decode(clean_b64)
-            if len(decoded) > MAX_IMAGE_SIZE_BYTES:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Image {i+1} exceeds maximum decoded size ({MAX_IMAGE_SIZE_BYTES // (1024*1024)}MB)"
-                )
-            
-            # Helper to get byte size
-            def get_size(data):
-                return len(data)
+    # Sort by original index and remove index field
+    results.sort(key=lambda x: x["index"])
+    return [{"mime_type": r["mime_type"], "data": r["data"]} for r in results]
 
-            # Resize if needed
-            try:
-                # Only attempt resize if image is somewhat large (>500KB) to save CPU on small icons
-                if get_size(decoded) > 500 * 1024:
-                    with Image.open(io.BytesIO(decoded)) as img:
-                        # Fix orientation
-                        try:
-                            img = ImageOps.exif_transpose(img)
-                        except Exception:
-                            pass
-                        
-                        # Resize logic using thumbnail (preserves aspect ratio)
-                        if max(img.size) > MAX_DIM:
-                            # Convert palette/RGBA to RGB for JPEG compatibility if needed
-                            if mime_type == "image/jpeg" and img.mode in ("RGBA", "P"):
-                                img = img.convert("RGB")
-                            elif mime_type == "image/png" and img.mode == "P":
-                                img = img.convert("RGBA")
 
-                            img.thumbnail((MAX_DIM, MAX_DIM)) # Default resampling is usually BICUBIC or similar in recent Pillow
-                            
-                            out_buf = io.BytesIO()
-                            fmt = "JPEG"
-                            if "png" in mime_type: fmt = "PNG"
-                            elif "webp" in mime_type: fmt = "WEBP"
-                            elif "gif" in mime_type: fmt = "GIF"
-                            
-                            img.save(out_buf, format=fmt, quality=85)
-                            decoded = out_buf.getvalue()
-                            logger.info(f"Resized image {i+1} to {img.size}")
-            except Exception as e:
-                # Log but proceed with original
-                logger.warning(f"Image resize failed for image {i}, proceeding with original: {e}")
-
-            image_parts.append({
-                "mime_type": mime_type,
-                "data": decoded
-            })
-        except base64.binascii.Error:
-            raise HTTPException(status_code=400, detail=f"Image {i+1} has invalid base64 encoding")
-
-    return image_parts
+def _decode_base64_images_fast(images: List[str]) -> List[Dict[str, Any]]:
+    """
+    Optimized image decoding for text extraction (ingredients).
+    Uses more aggressive compression since we only need readable text.
+    """
+    return _decode_base64_images(
+        images,
+        max_dim=768,           # Smaller - text still readable
+        quality=70,            # Lower quality - faster transfer
+        size_threshold=200 * 1024  # More aggressive resizing
+    )
 
 
 
@@ -708,7 +727,8 @@ def extract_ingredients_endpoint(payload: ExtractRequest, request: Request) -> E
     _enforce_rate_limit(request, is_vlm=True)  # Use stricter VLM rate limit
 
     decode_start = time.time()
-    image_parts = _decode_base64_images(payload.images)
+    # Use fast decoder optimized for text extraction
+    image_parts = _decode_base64_images_fast(payload.images)
     decode_end = time.time()
     logger.info(f"[Perf] Image decode/resize took {decode_end - decode_start:.2f}s for {len(payload.images)} images")
 
@@ -717,7 +737,7 @@ def extract_ingredients_endpoint(payload: ExtractRequest, request: Request) -> E
 
     try:
         vlm_start = time.time()
-        text = extract_ingredients_with_gemini(image_parts)
+        text = extract_ingredients_fast(image_parts)
         vlm_end = time.time()
         logger.info(f"[Perf] VLM extract_ingredients took {vlm_end - vlm_start:.2f}s")
         logger.info(f"[Perf] Total request took {vlm_end - start_time:.2f}s")
