@@ -14,6 +14,7 @@ interface BarcodeScannerProps {
 export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerProps) {
     const [barcode, setBarcode] = useState("")
     const [isCameraOpen, setIsCameraOpen] = useState(false)
+    const [isStarting, setIsStarting] = useState(false) // Prevent race conditions
     const [cameraError, setCameraError] = useState<string | null>(null)
     const scannerRef = useRef<Html5Qrcode | null>(null)
     const [scannerId] = useState("reader-" + Math.random().toString(36).substring(7))
@@ -159,9 +160,18 @@ export function BarcodeScanner({ onProductFound, isSearching }: BarcodeScannerPr
                                 Point your camera at a barcode to instantly analyze ingredients.
                             </p>
                         </div>
-                        <Button onClick={startCamera} size="lg" className="w-full">
-                            <ScanBarcode className="w-4 h-4 mr-2" />
-                            Enable Camera
+                        <Button onClick={startCamera} size="lg" className="w-full" disabled={isStarting}>
+                            {isStarting ? (
+                                <>
+                                    <span className="animate-spin mr-2">⏳</span>
+                                    Starting Camera...
+                                </>
+                            ) : (
+                                <>
+                                    <ScanBarcode className="w-4 h-4 mr-2" />
+                                    Enable Camera
+                                </>
+                            )}
                         </Button>
                         {cameraError && (
                             <p className="text-xs text-red-500 font-medium bg-red-50 p-2 rounded">
