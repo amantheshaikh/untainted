@@ -11,8 +11,8 @@ export default function ProfilePage() {
   return (
     <>
       <ProfileNavbar />
-      <div className="min-h-screen pt-32 pb-20 bg-background">
-        <div className="max-w-4xl mx-auto px-6">
+      <div className="min-h-screen pt-24 md:pt-32 pb-20 bg-background">
+        <div className="max-w-4xl mx-auto px-4 md:px-6">
           <Tabs defaultValue="analyze" className="space-y-8">
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">

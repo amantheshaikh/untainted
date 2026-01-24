@@ -102,16 +102,16 @@ export function FoodAnalyzer() {
             <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden min-h-[500px]">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <div className="bg-muted/50 border-b border-border p-2">
-                        <TabsList className="w-full grid grid-cols-3 h-12 bg-transparent">
-                            <TabsTrigger value="barcode" className="data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
+                        <TabsList className="w-full flex md:grid md:grid-cols-3 h-12 bg-transparent overflow-x-auto gap-1">
+                            <TabsTrigger value="barcode" className="data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2 whitespace-nowrap flex-1 md:flex-none px-4">
                                 <ScanBarcode className="w-4 h-4" />
                                 Scan Barcode
                             </TabsTrigger>
-                            <TabsTrigger value="scan" className="data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
+                            <TabsTrigger value="scan" className="data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2 whitespace-nowrap flex-1 md:flex-none px-4">
                                 <Camera className="w-4 h-4" />
                                 Scan Ingredients
                             </TabsTrigger>
-                            <TabsTrigger value="type" className="data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
+                            <TabsTrigger value="type" className="data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2 whitespace-nowrap flex-1 md:flex-none px-4">
                                 <Type className="w-4 h-4" />
                                 Type Ingredients
                             </TabsTrigger>
