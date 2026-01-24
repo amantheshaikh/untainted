@@ -44,6 +44,7 @@
     "expo-gl": "latest",
     "framer-motion": "^12.4.10",
     "gray-matter": "^4.0.3",
+    "html5-qrcode": "^2.3.8",
     "input-otp": "^1.4.2",
     "js-yaml": "^4.1.1",
     "lucide-react": "^0.542.0",

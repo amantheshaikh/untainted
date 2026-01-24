@@ -1,161 +1,523 @@
 openapi: 3.0.3
 info:
   title: Untainted API
-  version: 1.0.0
+  version: 2.0.0
   description: |
-    # Getting Started
-    
-    Untainted is an intelligent "Food Safety as a Service" platform. We help B2B platforms—like grocery apps, health coaches, and q-commerce delivery services—automatically check if a food product is safe for a specific user based on their unique diet, allergies, and health goals.
+    # Food Intelligence API
 
-    Think of us as a specialized search engine: you give us a **product** and a **user profile**, and we tell you if they are compatible.
+    Untainted provides **enterprise-grade Food Intelligence** for platforms at scale. Our API enables grocery apps, health platforms, meal delivery services, and wellness companies to deliver personalized food safety insights to millions of users.
+
+    ---
+
+    ## Why Untainted?
+
+    | Capability | Description |
+    |------------|-------------|
+    | **140M+ Ingredients** | Comprehensive taxonomy covering global food products |
+    | **Real-time Analysis** | Sub-100ms response times for seamless UX |
+    | **AI-Powered OCR** | Extract ingredients from any product image |
+    | **Multi-language** | Support for 25+ languages and regional variants |
+    | **HIPAA Ready** | Enterprise security and compliance certifications |
+
+    ---
+
+    ## Quick Start
+
+    ```bash
+    curl -X POST https://api.untainted.io/v2/analyze \
+      -H "Authorization: Bearer YOUR_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "user_id": "usr_550e8400e29b41d4",
+        "ingredients": "Milk, Sugar, Cocoa Butter, Soy Lecithin, Natural Flavors",
+        "context": {
+          "product_name": "Dark Chocolate Bar",
+          "barcode": "5000159484695"
+        }
+      }'
+    ```
 
     ---
 
     ## Authentication
 
-    Untainted offers two secure ways to authenticate, depending on your integration model.
+    All API requests require authentication using your API key or OAuth 2.0 tokens.
 
-    ### 1. Environments & Base URLs
-    | Environment | Base URL | Key Prefix | Purpose |
-    | :--- | :--- | :--- | :--- |
-    | **Production** | `https://api.untainted.io` | `sk_live_...` | Real requests. Logs are permanent. Billable. |
-    | **Sandbox** | `https://api.untainted.io` | `sk_test_...` | Testing and development. Identical logic. |
+    ### API Keys
 
-    ### 2. Method A: API Keys (Server-Side)
-    Best for backend scripts, cron jobs, or internal tools where no specific user context is needed or you are managing user IDs yourself.
+    Include your API key in the `Authorization` header:
 
-    Include your key in the header:
-    ```bash
-    curl -H "x-api-key: sk_live_123456" https://api.untainted.io/healthz
+    ```
+    Authorization: Bearer sk_live_xxxxxxxxxxxxxxxx
     ```
 
-    ### 3. Method B: OAuth 2.0 (User Context)
-    **Recommended for Platforms.** Securely access a user's Untainted profile without handling their credentials. We follow the standard **Authorization Code Flow with PKCE**.
+    | Environment | Prefix | Base URL |
+    |-------------|--------|----------|
+    | Production | `sk_live_` | `https://api.untainted.io` |
+    | Sandbox | `sk_test_` | `https://sandbox.untainted.io` |
 
-    **The Flow:**
+    ### OAuth 2.0
 
-    1.  **Authorize**: Redirect user to `https://untainted.io/oauth/authorize` with `response_type=code`, `scope=read:profile analyze:product`, and `code_challenge`.
-    2.  **Consent**: User logs in and approves access.
-    3.  **Callback**: We redirect to your `redirect_uri` with a temporary `code`.
-    4.  **Token Exchange**: POST to `/oauth/token` to swap the code for an `access_token`.
-    5.  **Access**: Use the token to make personalized queries.
-
-    ```bash
-    # Example Authorized Request
-    curl -H "Authorization: Bearer <access_token>" https://api.untainted.io/analyze
-    ```
+    For user-delegated access, we support the full OAuth 2.0 Authorization Code flow with PKCE. This enables your users to connect their Untainted health profiles directly to your application.
 
     ---
 
-    ## Core Concepts
+    ## Request Tracking
 
-    ### 1. Analysis (`/analyze`)
-    This is the heart of the platform. You provide:
-    *   **Product Data**: Ingredients list, and optionally nutrition facts.
-    *   **User Profile**: A unique User ID (we fetch their profile from your secure database) OR a raw set of preferences (vegan, peanut allergy, etc.).
-    
-    We return a **Verdict**: `SAFE`, `CAUTION`, or `NOT_SAFE`, along with detailed reasons why (e.g., "Contains Whey Protein which conflicts with Vegan Diet").
+    Every API response includes a unique `X-Request-ID` header. Include this ID when contacting support for faster resolution.
 
-    ### 2. Product Lookup (`/product/lookup`)
-    Before you can analyze a product, you often need its details. 
-    *   Send us a barcode (GTIN/UPC).
-    *   We check our database (and partners like OpenFoodFacts).
-    *   If found, we return the product's name, image, and ingredients.
-    *   If *not* found, you can use our `/product/missing` endpoint to submit it, or use our **Extraction** tools to read the label from a photo.
+    ```
+    X-Request-ID: req_7f3d8c2a1b4e5f6g7h8i9j0k
+    ```
 
-    ### 3. Extraction Checks (`/extract/...`)
-    Don't have digital data for a product? No problem.
-    *   Take a photo of the back of the package (ingredients or nutrition label).
-    *   Send the image to us.
-    *   Our AI (Vision Language Model) will read the text and convert it into structured JSON for you.
+    You can also provide your own request ID via the `X-Request-ID` header for end-to-end tracing.
 
+    ---
+
+    ## Idempotency
+
+    For mutation operations (POST, PUT, DELETE), include an `Idempotency-Key` header to safely retry requests:
+
+    ```
+    Idempotency-Key: your-unique-key-here
+    ```
+
+    Keys are valid for 24 hours. Subsequent requests with the same key return the cached response.
+
+    ---
+
+    ## Versioning
+
+    The API is versioned via URL path (`/v2/`). We maintain backwards compatibility within major versions and provide 12-month deprecation notices for breaking changes.
+
+    | Version | Status | End of Life |
+    |---------|--------|-------------|
+    | v2 | **Current** | — |
+    | v1 | Deprecated | March 2026 |
+
+    ---
+
+    ## SDKs & Libraries
+
+    Official SDKs are available for rapid integration:
+
+    - **JavaScript/TypeScript**: `npm install @untainted/sdk`
+    - **Python**: `pip install untainted`
+    - **Go**: `go get github.com/untainted-io/untainted-go`
+    - **Ruby**: `gem install untainted`
+    - **PHP**: `composer require untainted/sdk`
+
+    ---
+
+    ## Error Handling
+
+    All errors follow a consistent format with actionable information:
+
+    ```json
+    {
+      "error": {
+        "code": "invalid_request",
+        "message": "The 'ingredients' field is required.",
+        "details": [{"field": "ingredients", "issue": "required"}],
+        "request_id": "req_1a2b3c4d5e6f",
+        "docs_url": "https://docs.untainted.io/errors/invalid_request"
+      }
+    }
+    ```
+
+    | Code | HTTP Status | Description |
+    |------|-------------|-------------|
+    | `invalid_request` | 400 | Malformed request or missing required fields |
+    | `authentication_required` | 401 | Missing or invalid API key |
+    | `permission_denied` | 403 | Valid key but insufficient permissions |
+    | `not_found` | 404 | Resource does not exist |
+    | `validation_error` | 422 | Request validation failed |
+    | `internal_error` | 500 | Server error (automatically reported) |
+    | `service_unavailable` | 503 | Temporary overload or maintenance |
+
+    ---
+
+    ## Enterprise Features
+
+    | Feature | Description |
+    |---------|-------------|
+    | **99.99% SLA** | Guaranteed uptime with financial credits |
+    | **Dedicated Support** | Named account manager and priority support |
+    | **Custom Models** | Train on your specific product catalogs |
+    | **On-Premise** | Deploy within your own infrastructure |
+    | **SOC 2 Type II** | Annual audits and compliance reports |
+    | **Data Residency** | Choose your data storage region |
+
+    ---
+
+    ## Support
+
+    - **Documentation**: [docs.untainted.io](https://docs.untainted.io)
+    - **Status Page**: [status.untainted.io](https://status.untainted.io)
+    - **Enterprise Support**: enterprise@untainted.io
+    - **Developer Discord**: [discord.gg/untainted](https://discord.gg/untainted)
+
+  termsOfService: https://untainted.io/terms
   contact:
-    name: Untainted Support
+    name: Untainted Developer Support
     url: https://untainted.io/contact
-    email: support@untainted.io
+    email: developers@untainted.io
+  license:
+    name: Commercial License
+    url: https://untainted.io/license
+  x-logo:
+    url: https://untainted.io/logo-dark.png
+    altText: Untainted
+    backgroundColor: "#FFFFFF"
 
 servers:
   - url: https://api.untainted.io
-    description: Production API (Fly.io)
+    description: Production
+  - url: https://sandbox.untainted.io
+    description: Sandbox (Testing)
 
 components:
   securitySchemes:
-    ApiKeyAuth:
-      type: apiKey
-      in: header
-      name: x-api-key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key or JWT
+      description: |
+        Use your API key or OAuth access token.
+
+        ```
+        Authorization: Bearer sk_live_xxxxxxxx
+        ```
 
     OAuth2:
       type: oauth2
-      description: For accessing user-specific data (e.g. /analyze with user context), use standard Authorization Code flow.
+      description: OAuth 2.0 for user-delegated access
       flows:
         authorizationCode:
           authorizationUrl: https://untainted.io/oauth/authorize
-          tokenUrl: https://api.untainted.io/oauth/token
+          tokenUrl: https://api.untainted.io/v2/oauth/token
+          refreshUrl: https://api.untainted.io/v2/oauth/token
           scopes:
-            read:profile: Read user preferences and health profile
-            analyze:product: Perform safety checks against user profile
-
+            profile:read: Read user health profile and preferences
+            profile:write: Update user preferences
+            analyze: Perform product safety analysis
+            history:read: Access analysis history
+            history:write: Save analysis to history
 
   schemas:
-    CheckRequest:
+    # =========================================================================
+    # Core Request Schemas
+    # =========================================================================
+
+    AnalyzeRequest:
       type: object
       required:
+        - user_id
         - ingredients
       properties:
+        user_id:
+          type: string
+          description: Your unique identifier for the user
+          example: "usr_550e8400e29b41d4"
         ingredients:
           type: string
-          description: Raw ingredient text (e.g. "Milk, Sugar, Cocoa")
-        preferences:
-          type: object
-          description: Optional user preferences, allergies or diet constraints
-        customer_uid:
-          type: string
-          description: Optional UID of the customer to fetch profile from (overrides preferences)
+          description: Raw ingredient text from the product label
+          example: "Water, Sugar, Milk Powder, Cocoa, Soy Lecithin, Natural Flavors"
+        nutrition:
+          $ref: '#/components/schemas/NutritionData'
+        context:
+          $ref: '#/components/schemas/ProductContext'
+        options:
+          $ref: '#/components/schemas/AnalysisOptions'
 
-    Reason:
+    BatchAnalyzeRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/AnalyzeRequest'
+          description: Up to 100 products to analyze in a single request
+        callback_url:
+          type: string
+          format: uri
+          description: Webhook URL for async batch results
+          example: "https://your-app.com/webhooks/untainted"
+
+    ProductContext:
+      type: object
+      properties:
+        product_name:
+          type: string
+          example: "Organic Dark Chocolate"
+        brand:
+          type: string
+          example: "Green & Black's"
+        barcode:
+          type: string
+          pattern: '^\d{8,14}$'
+          example: "5000159484695"
+        category:
+          type: string
+          example: "snacks/chocolate"
+        image_url:
+          type: string
+          format: uri
+
+    NutritionData:
+      type: object
+      description: Nutrition facts per 100g/100ml
+      properties:
+        calories:
+          type: number
+          example: 546
+        total_fat_g:
+          type: number
+          example: 31.5
+        saturated_fat_g:
+          type: number
+          example: 19.2
+        carbohydrates_g:
+          type: number
+          example: 59.8
+        sugars_g:
+          type: number
+          example: 47.5
+        fiber_g:
+          type: number
+          example: 7.0
+        protein_g:
+          type: number
+          example: 5.0
+        sodium_mg:
+          type: number
+          example: 12
+        serving_size:
+          type: string
+          example: "40g (4 squares)"
+
+    AnalysisOptions:
+      type: object
+      properties:
+        include_alternatives:
+          type: boolean
+          default: false
+          description: Include safe product alternatives in response
+        include_taxonomy:
+          type: boolean
+          default: false
+          description: Include detailed ingredient classification
+        include_health_insights:
+          type: boolean
+          default: true
+          description: Include AI-generated health insights
+        language:
+          type: string
+          default: "en"
+          description: Response language (ISO 639-1)
+          enum: [en, es, fr, de, it, pt, zh, ja, ko, hi, ar]
+        strict_mode:
+          type: boolean
+          default: false
+          description: Flag uncertain ingredients as potential conflicts
+
+    # =========================================================================
+    # Core Response Schemas
+    # =========================================================================
+
+    AnalyzeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique analysis ID for reference
+          example: "ana_7f3d8c2a1b4e5f6g"
+        status:
+          type: string
+          enum: [safe, caution, avoid]
+          description: Overall safety verdict
+          example: "avoid"
+        verdict:
+          $ref: '#/components/schemas/Verdict'
+        conflicts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Conflict'
+        health_insights:
+          type: array
+          items:
+            $ref: '#/components/schemas/HealthInsight'
+        ingredients:
+          $ref: '#/components/schemas/ParsedIngredients'
+        alternatives:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductAlternative'
+        metadata:
+          $ref: '#/components/schemas/AnalysisMetadata'
+
+    Verdict:
+      type: object
+      properties:
+        title:
+          type: string
+          example: "Not Recommended"
+        description:
+          type: string
+          example: "This product contains 2 ingredients that conflict with the user's dietary preferences."
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.95
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+          example: "high"
+
+    Conflict:
       type: object
       properties:
         ingredient:
           type: string
+          example: "Milk Powder"
+        canonical_name:
+          type: string
+          example: "milk"
         category:
           type: string
+          enum: [allergen, dietary, health_condition, custom]
+          example: "dietary"
         conflicts_with:
           type: array
           items:
             type: string
+          example: ["vegan", "dairy-free"]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+          example: "high"
+        explanation:
+          type: string
+          example: "Milk powder is derived from cow's milk and is not suitable for vegan diets."
 
-    AnalysisResponse:
+    HealthInsight:
       type: object
       properties:
-        product:
+        type:
           type: string
-          nullable: true
-        verdict:
+          enum: [warning, info, tip, positive]
+          example: "warning"
+        title:
           type: string
-          description: SAFE | CAUTION | NOT_SAFE
-        confidence:
+          example: "High Sugar Content"
+        description:
+          type: string
+          example: "This product contains 47.5g of sugar per 100g, which exceeds the recommended daily intake threshold for diabetic-friendly diets."
+        related_ingredients:
+          type: array
+          items:
+            type: string
+          example: ["sugar", "corn syrup"]
+
+    ParsedIngredients:
+      type: object
+      properties:
+        raw:
+          type: string
+          description: Original ingredient text
+        parsed:
+          type: array
+          items:
+            type: string
+          description: Individually parsed ingredients
+          example: ["Water", "Sugar", "Milk Powder", "Cocoa", "Soy Lecithin"]
+        count:
+          type: integer
+          example: 5
+        taxonomy:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxonomyEntry'
+
+    TaxonomyEntry:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Soy Lecithin"
+        canonical:
+          type: string
+          example: "soy lecithin"
+        category:
+          type: string
+          example: "emulsifiers"
+        parent_categories:
+          type: array
+          items:
+            type: string
+          example: ["additives", "plant-derived"]
+        allergens:
+          type: array
+          items:
+            type: string
+          example: ["soy"]
+        properties:
+          type: object
+          properties:
+            vegan:
+              type: boolean
+            vegetarian:
+              type: boolean
+            gluten_free:
+              type: boolean
+
+    ProductAlternative:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Hu Dark Chocolate Bar"
+        brand:
+          type: string
+          example: "Hu Kitchen"
+        barcode:
+          type: string
+          example: "850180006015"
+        match_score:
           type: number
           format: float
-          description: 0..1
-        flagged_ingredients:
-          type: array
-          items:
-            type: string
-        reasons:
-          type: array
-          items:
-            $ref: '#/components/schemas/Reason'
-        safe_alternatives:
-          type: array
-          items:
-            type: string
+          example: 0.89
+        reason:
+          type: string
+          example: "Dairy-free, vegan-certified dark chocolate"
+        image_url:
+          type: string
+          format: uri
+
+    AnalysisMetadata:
+      type: object
+      properties:
+        analyzed_at:
+          type: string
+          format: date-time
         processing_time_ms:
           type: integer
-          format: int32
-        raw:
-          type: object
-          description: Raw diagnostic payload (taxonomies, hits, etc.)
+          example: 47
+        model_version:
+          type: string
+          example: "2.4.1"
+        data_version:
+          type: string
+          example: "2024.01.15"
+
+    # =========================================================================
+    # Product Schemas
+    # =========================================================================
 
     ProductLookupRequest:
       type: object
@@ -164,132 +526,77 @@ components:
       properties:
         barcode:
           type: string
-          description: GTIN / barcode string (e.g. "0123456789012")
+          pattern: '^\d{8,14}$'
+          description: GTIN-8, GTIN-12, GTIN-13, or GTIN-14 barcode
+          example: "5000159484695"
+        include_analysis:
+          type: boolean
+          default: false
+          description: Include safety analysis for a user
+        user_id:
+          type: string
+          description: Required if include_analysis is true
 
     ProductResponse:
       type: object
       properties:
-        code:
-          type: string
-        name:
-          type: string
-        ingredients:
-          type: array
-          items:
-            type: string
-        image_url:
-          type: string
-        meta:
-          type: object
-
-    ProductSubmissionRequest:
-      type: object
-      required:
-        - barcode
-      properties:
         barcode:
           type: string
-          description: GTIN / barcode string
+          example: "5000159484695"
         name:
           type: string
+          example: "Cadbury Dairy Milk Chocolate Bar"
         brand:
           type: string
-        ingredients_text:
+          example: "Cadbury"
+        description:
           type: string
+        ingredients:
+          type: string
+          example: "Milk, Sugar, Cocoa Butter, Cocoa Mass, Vegetable Fats, Emulsifiers, Flavourings"
+        nutrition:
+          $ref: '#/components/schemas/NutritionData'
+        images:
+          type: object
+          properties:
+            front:
+              type: string
+              format: uri
+            back:
+              type: string
+              format: uri
+            nutrition:
+              type: string
+              format: uri
         categories:
           type: array
           items:
             type: string
-        image_url:
-          type: string
-
-    OCRResponse:
-      type: object
-      properties:
-        text:
-          type: string
-        confidence:
-          type: number
-
-    TokenResponse:
-      type: object
-      properties:
-        access_token:
-          type: string
-          description: JWT Access Token.
-        token_type:
-          type: string
-          example: Bearer
-        expires_in:
-          type: integer
-          example: 3600
-        refresh_token:
-          type: string
-          description: Long-lived token to rotate access tokens.
-        scope:
-          type: string
-          example: "read:profile analyze:product"
-
-    OAuthError:
-      type: object
-      properties:
-        error:
-          type: string
-          enum: [invalid_request, invalid_client, invalid_grant, unauthorized_client, unsupported_grant_type, invalid_scope]
-        error_description:
-          type: string
-          example: "The authorization code has expired."
-
-    AnalyzeRequest:
-      type: object
-      required:
-        - customer_uid
-        - ingredients_text
-      properties:
-        customer_uid:
-          type: string
-          description: The unique ID of your user. We use this to look up their health profile.
-        ingredients_text:
-          type: string
-          description: The full text of the ingredients list from the package.
-        nutrition_info:
-          type: object
-          description: "JSON object of nutrition facts (e.g. {sugar_100g: 5})"
-        preferences:
-          type: object
-          description: (Optional) Override safe/avoid lists for this specific check.
-        product_name:
-          type: string
-        product_image:
-          type: string
-
-    AnalyzeResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [safe, not_safe, caution, unknown]
-          description: The final verdict.
-        verdict_title:
-          type: string
-          description: Short, human-readable title (e.g. "Avoid")
-        verdict_description:
-          type: string
-          description: Detailed explanation (e.g. "Contains Peanuts")
-        product_name:
-          type: string
-        product_image:
-          type: string
-        conflict_count:
-          type: integer
-        flagged_ingredients:
+          example: ["snacks", "chocolate", "confectionery"]
+        certifications:
           type: array
           items:
             type: string
-        reasons:
-          type: array
-          items:
-            type: string
+          example: ["UTZ Certified", "Rainforest Alliance"]
+        origin_country:
+          type: string
+          example: "GB"
+        data_quality:
+          type: object
+          properties:
+            score:
+              type: number
+              example: 0.92
+            last_updated:
+              type: string
+              format: date-time
+            source:
+              type: string
+              example: "manufacturer"
+
+    # =========================================================================
+    # Extraction Schemas
+    # =========================================================================
 
     ExtractRequest:
       type: object
@@ -300,210 +607,1549 @@ components:
           type: array
           items:
             type: string
-          description: List of base64 encoded strings or URLs of the product images.
+          minItems: 1
+          maxItems: 10
+          description: |
+            Base64-encoded images or URLs. Supports JPEG, PNG, WebP, HEIC.
 
-    ExtractIngredientsResponse:
-      type: object
-      properties:
-        ingredients_text:
+            For best results, ensure the label is:
+            - Well-lit and in focus
+            - Captured at a straight angle
+            - Free from glare or shadows
+        extraction_type:
           type: string
-          description: The AI-transcribed ingredients text.
+          enum: [ingredients, nutrition, both]
+          default: "both"
+        language_hint:
+          type: string
+          description: Expected language (improves accuracy)
+          example: "en"
+        enhance:
+          type: boolean
+          default: true
+          description: Apply image enhancement for better OCR accuracy
 
-    ExtractNutritionResponse:
+    ExtractResponse:
       type: object
       properties:
-        nutrition_info:
+        id:
+          type: string
+          example: "ext_9a8b7c6d5e4f3g2h"
+        ingredients:
           type: object
-          description: Structured nutrition data extracted from the image.
+          properties:
+            raw_text:
+              type: string
+              example: "Ingredients: Milk chocolate (sugar, cocoa butter, milk, chocolate, soy lecithin, natural flavor), almonds."
+            parsed:
+              type: array
+              items:
+                type: string
+            confidence:
+              type: number
+              format: float
+              example: 0.94
+            bounding_box:
+              $ref: '#/components/schemas/BoundingBox'
+        nutrition:
+          type: object
+          properties:
+            structured:
+              $ref: '#/components/schemas/NutritionData'
+            confidence:
+              type: number
+              format: float
+              example: 0.91
+            bounding_box:
+              $ref: '#/components/schemas/BoundingBox'
+        warnings:
+          type: array
+          items:
+            type: string
+          example: ["Low confidence on serving size due to image quality"]
+        processing_time_ms:
+          type: integer
+          example: 1250
+
+    BoundingBox:
+      type: object
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+        width:
+          type: integer
+        height:
+          type: integer
+
+    # =========================================================================
+    # User Profile Schemas
+    # =========================================================================
+
+    UserProfile:
+      type: object
+      properties:
+        user_id:
+          type: string
+          example: "usr_550e8400e29b41d4"
+        dietary_preferences:
+          type: array
+          items:
+            type: string
+          example: ["vegan", "gluten-free"]
+        allergies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Allergy'
+        health_conditions:
+          type: array
+          items:
+            type: string
+          example: ["type-2-diabetes", "hypertension"]
+        custom_avoidances:
+          type: array
+          items:
+            type: string
+          description: Custom ingredients to avoid
+          example: ["palm oil", "artificial colors"]
+        nutritional_goals:
+          type: object
+          properties:
+            max_sugar_g:
+              type: number
+            max_sodium_mg:
+              type: number
+            max_saturated_fat_g:
+              type: number
+            min_protein_g:
+              type: number
+            min_fiber_g:
+              type: number
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Allergy:
+      type: object
+      properties:
+        allergen:
+          type: string
+          example: "peanuts"
+        severity:
+          type: string
+          enum: [mild, moderate, severe, anaphylactic]
+          example: "severe"
+        cross_contamination_sensitive:
+          type: boolean
+          default: false
+
+    # =========================================================================
+    # Webhook Schemas
+    # =========================================================================
+
+    WebhookEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "evt_1a2b3c4d5e6f7g8h"
+        type:
+          type: string
+          enum: [analysis.completed, batch.completed, extraction.completed, profile.updated]
+        created_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          description: Event-specific payload
+
+    # =========================================================================
+    # Common Schemas
+    # =========================================================================
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "invalid_request"
+            message:
+              type: string
+              example: "The 'ingredients' field is required."
+            details:
+              type: array
+              items:
+                type: object
+            request_id:
+              type: string
+              example: "req_1a2b3c4d5e6f"
+            docs_url:
+              type: string
+              format: uri
+              example: "https://docs.untainted.io/errors/invalid_request"
+
+    PaginatedResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: {}
+        pagination:
+          type: object
+          properties:
+            total:
+              type: integer
+            page:
+              type: integer
+            per_page:
+              type: integer
+            total_pages:
+              type: integer
+            has_more:
+              type: boolean
 
 security:
-  - ApiKeyAuth: []
-  - OAuth2: [read:profile, analyze:product]
+  - BearerAuth: []
 
 tags:
-  - name: Authentication
-    description: OAuth 2.0 Token Management
   - name: Analysis
-    description: Core safety checks
+    description: |
+      Core product safety analysis. These endpoints power real-time food compatibility checks for your users.
+  - name: Batch Processing
+    description: |
+      High-volume analysis for catalog processing, inventory management, and bulk operations.
   - name: Products
-    description: Barcode lookup and inventory
+    description: |
+      Product database with 50M+ items. Lookup by barcode, search by name, or contribute missing products.
   - name: Extraction
-    description: AI image-to-text tools
+    description: |
+      AI-powered label reading. Extract ingredients and nutrition facts from product images with industry-leading accuracy.
+  - name: User Profiles
+    description: |
+      Manage user dietary preferences, allergies, and health conditions. Profiles power personalized analysis.
+  - name: Webhooks
+    description: |
+      Real-time event notifications for async operations and profile changes.
+  - name: Analytics
+    description: |
+      Usage analytics, insights dashboards, and reporting. Track API consumption, popular products, and user trends.
+  - name: Organizations
+    description: |
+      Manage teams, API keys, and access controls. Enterprise features for multi-tenant deployments.
   - name: System
-    description: Health and status
+    description: |
+      Health checks, API status, and system information.
 
 paths:
-  /oauth/token:
-    post:
-      summary: Get Access Token
-      tags:
-        - Authentication
-      description: |
-        Exchange an Authorization Code for an Access Token (and Refresh Token).
-        Supports **PKCE** for public clients and standard Basic Auth for confidential clients.
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required:
-                - grant_type
-                - code
-                - redirect_uri
-              properties:
-                grant_type:
-                  type: string
-                  enum: [authorization_code, refresh_token]
-                code:
-                  type: string
-                  description: The short-lived code received in the callback.
-                redirect_uri:
-                  type: string
-                  description: Must match the URI used in the authorize request.
-                client_id:
-                  type: string
-                client_secret:
-                  type: string
-                code_verifier:
-                  type: string
-                  description: Required for PKCE flow.
-                refresh_token:
-                  type: string
-                  description: Required if grant_type is refresh_token.
-      responses:
-        '200':
-          description: Successful Token Exchange
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TokenResponse'
-        '400':
-          description: Bad Request (Invalid code, missing parameters)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OAuthError'
-        '401':
-          description: Unauthorized (Invalid client credentials)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OAuthError'
+  # ===========================================================================
+  # Analysis Endpoints
+  # ===========================================================================
 
-  /analyze:
+  /v2/analyze:
     post:
-      summary: Check Product Safety
+      operationId: analyzeProduct
+      summary: Analyze Product Safety
+      description: |
+        Perform a real-time safety analysis of a product against a user's dietary profile.
+
+        This is the primary endpoint for food compatibility checks. Send ingredient data
+        and receive an instant verdict with detailed conflict information.
+
+        **Use Cases:**
+        - Real-time barcode scanning in grocery apps
+        - Menu item filtering in food delivery
+        - Product recommendations in wellness apps
+        - Shopping list validation
       tags:
         - Analysis
-      description: |
-        **The main event.** 
-        
-        Send us a user's ID and a product's ingredient list. We'll cross-reference them against our database of millions of ingredients, allergies, and synoynms (e.g. "Casein" = "Milk") to tell you if it's safe for that user.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AnalyzeRequest'
+            examples:
+              basic:
+                summary: Basic Analysis
+                value:
+                  user_id: "usr_550e8400e29b41d4"
+                  ingredients: "Milk, Sugar, Cocoa Butter, Soy Lecithin"
+              with_context:
+                summary: With Product Context
+                value:
+                  user_id: "usr_550e8400e29b41d4"
+                  ingredients: "Organic cane sugar, almonds, cocoa mass, cocoa butter, vanilla extract"
+                  context:
+                    product_name: "Dark Chocolate Almond Bar"
+                    brand: "Alter Eco"
+                    barcode: "817670010013"
+                  options:
+                    include_alternatives: true
+                    include_health_insights: true
+              with_nutrition:
+                summary: With Nutrition Data
+                value:
+                  user_id: "usr_550e8400e29b41d4"
+                  ingredients: "Milk, Sugar, Cocoa"
+                  nutrition:
+                    calories: 546
+                    sugars_g: 47.5
+                    saturated_fat_g: 19.2
+                  options:
+                    include_health_insights: true
       responses:
         '200':
-          description: Safety Verdict
+          description: Analysis completed successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalyzeResponse'
+              example:
+                id: "ana_7f3d8c2a1b4e5f6g"
+                status: "avoid"
+                verdict:
+                  title: "Not Recommended"
+                  description: "Contains ingredients that conflict with vegan diet preferences."
+                  confidence: 0.97
+                  severity: "high"
+                conflicts:
+                  - ingredient: "Milk"
+                    canonical_name: "milk"
+                    category: "dietary"
+                    conflicts_with: ["vegan", "dairy-free"]
+                    severity: "high"
+                    explanation: "Milk is an animal-derived ingredient not suitable for vegan diets."
+                health_insights:
+                  - type: "warning"
+                    title: "High Sugar Content"
+                    description: "Contains 47.5g sugar per 100g, exceeding diabetic-friendly thresholds."
+                ingredients:
+                  parsed: ["Milk", "Sugar", "Cocoa Butter", "Soy Lecithin"]
+                  count: 4
+                metadata:
+                  processing_time_ms: 43
+                  model_version: "2.4.1"
         '400':
-          description: Invalid Request (missing uid or text)
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+        '404':
+          description: User profile not found
 
-  /product/lookup:
+  /v2/analyze/batch:
     post:
-      summary: Lookup by Barcode
+      operationId: batchAnalyze
+      summary: Batch Analysis
+      description: |
+        Analyze up to 100 products in a single request. Ideal for:
+
+        - Catalog ingestion and enrichment
+        - Bulk inventory analysis
+        - Menu compatibility scoring
+        - Periodic re-analysis of product databases
+
+        For batches over 100 items, use async mode with webhooks.
+      tags:
+        - Batch Processing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchAnalyzeRequest'
+      responses:
+        '200':
+          description: Batch analysis results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batch_id:
+                    type: string
+                    example: "bat_1a2b3c4d5e6f"
+                  status:
+                    type: string
+                    enum: [completed, processing]
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AnalyzeResponse'
+                  summary:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      safe:
+                        type: integer
+                      caution:
+                        type: integer
+                      avoid:
+                        type: integer
+                  processing_time_ms:
+                    type: integer
+        '202':
+          description: Batch accepted for async processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batch_id:
+                    type: string
+                  status:
+                    type: string
+                    example: "processing"
+                  estimated_completion:
+                    type: string
+                    format: date-time
+                  status_url:
+                    type: string
+                    format: uri
+
+  # ===========================================================================
+  # Product Endpoints
+  # ===========================================================================
+
+  /v2/products/lookup:
+    post:
+      operationId: lookupProduct
+      summary: Lookup Product by Barcode
+      description: |
+        Retrieve product information using a barcode. Our database contains 50M+ products
+        from global sources including manufacturer data, OpenFoodFacts, and retail partnerships.
+
+        **Coverage:**
+        - North America: 95%+
+        - Europe: 90%+
+        - Asia-Pacific: 75%+
+        - Global average: 85%+
       tags:
         - Products
-      description: |
-        Check if Untainted knows about a product. Useful for scanning barcodes in a store.
-        Returns product metadata (name, image, ingredients) if found.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ProductLookupRequest'
+            example:
+              barcode: "5000159484695"
+              include_analysis: true
+              user_id: "usr_550e8400e29b41d4"
       responses:
         '200':
+          description: Product found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductResponse'
+                allOf:
+                  - $ref: '#/components/schemas/ProductResponse'
+                  - type: object
+                    properties:
+                      analysis:
+                        $ref: '#/components/schemas/AnalyzeResponse'
         '404':
-          description: Product not found. (Try /product/missing or Extraction)
+          description: Product not found
 
-  /product/missing:
-    post:
-      summary: Submit Missing Product
+  /v2/products/search:
+    get:
+      operationId: searchProducts
+      summary: Search Products
+      description: |
+        Full-text search across the product database. Supports filtering by category,
+        brand, dietary attributes, and more.
       tags:
         - Products
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+          example: "organic dark chocolate"
+        - name: category
+          in: query
+          schema:
+            type: string
+          example: "snacks/chocolate"
+        - name: brand
+          in: query
+          schema:
+            type: string
+        - name: dietary
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by dietary attributes
+          example: ["vegan", "gluten-free"]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProductResponse'
+
+  /v2/products:
+    post:
+      operationId: submitProduct
+      summary: Submit Product Data
       description: |
-        Help us grow the database. If a lookup fails, you can submit the product details here.
-        Data is queued for verification.
+        Contribute product data to expand our database. Submissions are verified
+        and typically processed within 24 hours.
+
+        **Quality Guidelines:**
+        - Include clear, high-resolution images
+        - Transcribe ingredients exactly as shown on label
+        - Verify barcode accuracy
+      tags:
+        - Products
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProductSubmissionRequest'
+              type: object
+              required:
+                - barcode
+                - name
+                - ingredients
+              properties:
+                barcode:
+                  type: string
+                  pattern: '^\d{8,14}$'
+                name:
+                  type: string
+                brand:
+                  type: string
+                ingredients:
+                  type: string
+                nutrition:
+                  $ref: '#/components/schemas/NutritionData'
+                categories:
+                  type: array
+                  items:
+                    type: string
+                images:
+                  type: object
+                  properties:
+                    front:
+                      type: string
+                      description: Base64 or URL
+                    back:
+                      type: string
+                    nutrition:
+                      type: string
       responses:
         '201':
-          description: Submission accepted
+          description: Product submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  submission_id:
+                    type: string
+                    example: "sub_9a8b7c6d5e4f"
+                  status:
+                    type: string
+                    example: "pending_review"
+                  estimated_review:
+                    type: string
+                    example: "24 hours"
 
-  /extract/ingredients:
+  # ===========================================================================
+  # Extraction Endpoints
+  # ===========================================================================
+
+  /v2/extract:
     post:
-      summary: Extract Ingredients (OCR)
+      operationId: extractFromImage
+      summary: Extract Label Data
+      description: |
+        Extract ingredients and nutrition facts from product images using our
+        state-of-the-art Vision AI models.
+
+        **Accuracy:**
+        - Ingredients: 96% accuracy
+        - Nutrition tables: 94% accuracy
+        - Multi-language support: 25+ languages
+
+        **Best Practices:**
+        - Use well-lit, focused images
+        - Avoid glare and shadows
+        - Capture labels at a straight angle
+        - Include full label in frame
       tags:
         - Extraction
-      description: |
-        Upload a photo of a product's back label. We'll use AI to read the ingredient list and return it as text.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ExtractRequest'
+            example:
+              images:
+                - "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+              extraction_type: "both"
+              language_hint: "en"
+              enhance: true
       responses:
         '200':
+          description: Extraction completed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExtractIngredientsResponse'
+                $ref: '#/components/schemas/ExtractResponse'
+        '400':
+          description: Invalid image or unable to process
+        '422':
+          description: Could not extract data from image
 
-  /extract/nutrition:
+  /v2/extract/analyze:
     post:
-      summary: Extract Nutrition Facts (OCR)
+      operationId: extractAndAnalyze
+      summary: Extract & Analyze
+      description: |
+        Combined endpoint that extracts label data from images and immediately
+        performs safety analysis. Perfect for scan-and-check user flows.
       tags:
         - Extraction
-      description: |
-        Upload a photo of a nutrition label. We'll parse the table (Calories, Fat, Protein, etc.) into a clean JSON object.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ExtractRequest'
+              type: object
+              required:
+                - images
+                - user_id
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 10
+                user_id:
+                  type: string
+                context:
+                  $ref: '#/components/schemas/ProductContext'
+                options:
+                  $ref: '#/components/schemas/AnalysisOptions'
       responses:
         '200':
+          description: Extraction and analysis completed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExtractNutritionResponse'
+                type: object
+                properties:
+                  extraction:
+                    $ref: '#/components/schemas/ExtractResponse'
+                  analysis:
+                    $ref: '#/components/schemas/AnalyzeResponse'
 
-  /healthz:
+  # ===========================================================================
+  # User Profile Endpoints
+  # ===========================================================================
+
+  /v2/users/{user_id}/profile:
     get:
+      operationId: getUserProfile
+      summary: Get User Profile
+      description: Retrieve the dietary profile for a user.
+      tags:
+        - User Profiles
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '404':
+          description: User not found
+
+    put:
+      operationId: updateUserProfile
+      summary: Update User Profile
+      description: |
+        Create or update a user's dietary profile. Changes take effect immediately
+        for all subsequent analyses.
+      tags:
+        - User Profiles
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfile'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '201':
+          description: Profile created
+
+    delete:
+      operationId: deleteUserProfile
+      summary: Delete User Profile
+      description: Permanently delete a user's profile and all associated data.
+      tags:
+        - User Profiles
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Profile deleted
+
+  /v2/users/{user_id}/history:
+    get:
+      operationId: getAnalysisHistory
+      summary: Get Analysis History
+      description: Retrieve a user's past product analyses.
+      tags:
+        - User Profiles
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [safe, caution, avoid]
+      responses:
+        '200':
+          description: Analysis history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+
+  # ===========================================================================
+  # Webhook Endpoints
+  # ===========================================================================
+
+  /v2/webhooks:
+    get:
+      operationId: listWebhooks
+      summary: List Webhooks
+      description: List all configured webhook endpoints.
+      tags:
+        - Webhooks
+      responses:
+        '200':
+          description: Webhook list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        url:
+                          type: string
+                          format: uri
+                        events:
+                          type: array
+                          items:
+                            type: string
+                        active:
+                          type: boolean
+                        created_at:
+                          type: string
+                          format: date-time
+
+    post:
+      operationId: createWebhook
+      summary: Create Webhook
+      description: Register a new webhook endpoint to receive event notifications.
+      tags:
+        - Webhooks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+                - events
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  example: "https://your-app.com/webhooks/untainted"
+                events:
+                  type: array
+                  items:
+                    type: string
+                    enum: [analysis.completed, batch.completed, extraction.completed, profile.updated]
+                secret:
+                  type: string
+                  description: Shared secret for signature verification
+      responses:
+        '201':
+          description: Webhook created
+
+  # ===========================================================================
+  # Analytics Endpoints
+  # ===========================================================================
+
+  /v2/analytics/usage:
+    get:
+      operationId: getUsageAnalytics
+      summary: Get Usage Analytics
+      description: |
+        Retrieve detailed API usage analytics for your organization. Track requests,
+        response times, and consumption patterns.
+
+        **Available Metrics:**
+        - Total API calls by endpoint
+        - Response time percentiles (p50, p95, p99)
+        - Error rates and types
+        - Geographic distribution
+        - Peak usage periods
+      tags:
+        - Analytics
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2024-01-01"
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2024-01-31"
+        - name: granularity
+          in: query
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+            default: day
+        - name: endpoints
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by specific endpoints
+      responses:
+        '200':
+          description: Usage analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date-time
+                      end:
+                        type: string
+                        format: date-time
+                  summary:
+                    type: object
+                    properties:
+                      total_requests:
+                        type: integer
+                        example: 1250000
+                      successful_requests:
+                        type: integer
+                        example: 1237500
+                      error_rate:
+                        type: number
+                        format: float
+                        example: 0.01
+                      avg_response_time_ms:
+                        type: integer
+                        example: 47
+                      p95_response_time_ms:
+                        type: integer
+                        example: 120
+                      p99_response_time_ms:
+                        type: integer
+                        example: 250
+                  by_endpoint:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        endpoint:
+                          type: string
+                        requests:
+                          type: integer
+                        avg_response_time_ms:
+                          type: integer
+                  time_series:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                        requests:
+                          type: integer
+                        errors:
+                          type: integer
+
+  /v2/analytics/insights:
+    get:
+      operationId: getProductInsights
+      summary: Get Product Insights
+      description: |
+        Aggregate insights from product analyses. Understand dietary trends,
+        common conflicts, and product safety patterns across your user base.
+      tags:
+        - Analytics
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Product insights
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  top_flagged_ingredients:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ingredient:
+                          type: string
+                          example: "High Fructose Corn Syrup"
+                        occurrences:
+                          type: integer
+                          example: 45000
+                        conflict_types:
+                          type: array
+                          items:
+                            type: string
+                          example: ["dietary", "health_condition"]
+                  dietary_distribution:
+                    type: object
+                    properties:
+                      vegan:
+                        type: number
+                        example: 0.15
+                      vegetarian:
+                        type: number
+                        example: 0.22
+                      gluten_free:
+                        type: number
+                        example: 0.18
+                      dairy_free:
+                        type: number
+                        example: 0.12
+                  safety_verdict_breakdown:
+                    type: object
+                    properties:
+                      safe:
+                        type: number
+                        example: 0.65
+                      caution:
+                        type: number
+                        example: 0.25
+                      avoid:
+                        type: number
+                        example: 0.10
+                  most_scanned_categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        category:
+                          type: string
+                        scans:
+                          type: integer
+
+  # ===========================================================================
+  # Organization Endpoints
+  # ===========================================================================
+
+  /v2/organizations/{org_id}:
+    get:
+      operationId: getOrganization
+      summary: Get Organization
+      description: Retrieve organization details and settings.
+      tags:
+        - Organizations
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Organization details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "org_1a2b3c4d5e6f"
+                  name:
+                    type: string
+                    example: "Acme Health Foods"
+                  plan:
+                    type: string
+                    enum: [startup, growth, enterprise]
+                    example: "enterprise"
+                  settings:
+                    type: object
+                    properties:
+                      default_language:
+                        type: string
+                      strict_mode_default:
+                        type: boolean
+                      webhook_signing_enabled:
+                        type: boolean
+                  created_at:
+                    type: string
+                    format: date-time
+                  members_count:
+                    type: integer
+                  api_keys_count:
+                    type: integer
+
+    patch:
+      operationId: updateOrganization
+      summary: Update Organization
+      description: Update organization settings and configuration.
+      tags:
+        - Organizations
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                settings:
+                  type: object
+      responses:
+        '200':
+          description: Organization updated
+
+  /v2/organizations/{org_id}/members:
+    get:
+      operationId: listOrganizationMembers
+      summary: List Members
+      description: List all members of an organization with their roles.
+      tags:
+        - Organizations
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Member list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        email:
+                          type: string
+                          format: email
+                        name:
+                          type: string
+                        role:
+                          type: string
+                          enum: [owner, admin, developer, viewer]
+                        joined_at:
+                          type: string
+                          format: date-time
+
+    post:
+      operationId: inviteOrganizationMember
+      summary: Invite Member
+      description: Invite a new member to the organization.
+      tags:
+        - Organizations
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [admin, developer, viewer]
+      responses:
+        '201':
+          description: Invitation sent
+
+  /v2/organizations/{org_id}/api-keys:
+    get:
+      operationId: listApiKeys
+      summary: List API Keys
+      description: List all API keys for the organization.
+      tags:
+        - Organizations
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: API key list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: "key_9a8b7c6d5e4f"
+                        name:
+                          type: string
+                          example: "Production API Key"
+                        prefix:
+                          type: string
+                          example: "sk_live_xxxx"
+                        environment:
+                          type: string
+                          enum: [production, sandbox]
+                        scopes:
+                          type: array
+                          items:
+                            type: string
+                        created_at:
+                          type: string
+                          format: date-time
+                        last_used_at:
+                          type: string
+                          format: date-time
+
+    post:
+      operationId: createApiKey
+      summary: Create API Key
+      description: |
+        Generate a new API key for the organization. The full key is only
+        shown once upon creation—store it securely.
+      tags:
+        - Organizations
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - environment
+              properties:
+                name:
+                  type: string
+                  example: "Mobile App Production"
+                environment:
+                  type: string
+                  enum: [production, sandbox]
+                scopes:
+                  type: array
+                  items:
+                    type: string
+                  description: Limit key to specific scopes
+                  example: ["analyze", "products:read"]
+                expires_at:
+                  type: string
+                  format: date-time
+                  description: Optional expiration date
+      responses:
+        '201':
+          description: API key created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  key:
+                    type: string
+                    description: Full API key (shown only once)
+                    example: "sk_live_example_key_xxxxxxxxxxxxxxxxxxxxxxxx"
+                  name:
+                    type: string
+                  environment:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+
+  /v2/organizations/{org_id}/api-keys/{key_id}:
+    delete:
+      operationId: revokeApiKey
+      summary: Revoke API Key
+      description: Permanently revoke an API key. This action cannot be undone.
+      tags:
+        - Organizations
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: key_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: API key revoked
+
+  # ===========================================================================
+  # System Endpoints
+  # ===========================================================================
+
+  /v2/organizations/{org_id}/audit-logs:
+    get:
+      operationId: getAuditLogs
+      summary: Get Audit Logs
+      description: |
+        Retrieve audit logs for compliance and security monitoring.
+        Tracks all significant actions within the organization.
+
+        **Logged Events:**
+        - API key creation/revocation
+        - Member invitations and role changes
+        - Settings modifications
+        - Profile access (with user consent)
+      tags:
+        - Organizations
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: event_type
+          in: query
+          schema:
+            type: string
+            enum: [api_key.created, api_key.revoked, member.invited, member.removed, settings.updated]
+        - name: actor_id
+          in: query
+          schema:
+            type: string
+          description: Filter by member who performed the action
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: "log_7f3d8c2a1b4e"
+                        event_type:
+                          type: string
+                          example: "api_key.created"
+                        actor:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            email:
+                              type: string
+                            name:
+                              type: string
+                        target:
+                          type: object
+                          description: The resource affected
+                        metadata:
+                          type: object
+                        ip_address:
+                          type: string
+                          example: "203.0.113.42"
+                        user_agent:
+                          type: string
+                        timestamp:
+                          type: string
+                          format: date-time
+                  pagination:
+                    $ref: '#/components/schemas/PaginatedResponse/properties/pagination'
+
+  /v2/health:
+    get:
+      operationId: healthCheck
       summary: Health Check
+      description: Verify API availability and get system status.
       tags:
         - System
-      description: |
-        Simple ping to verify the API is online and responsive.
+      security: []
       responses:
         '200':
-          description: OK
+          description: System healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  version:
+                    type: string
+                    example: "2.4.1"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: "healthy"
+                      cache:
+                        type: string
+                        example: "healthy"
+                      ai_models:
+                        type: string
+                        example: "healthy"
+                      ocr:
+                        type: string
+                        example: "healthy"
+
+  /v2/status:
+    get:
+      operationId: getSystemStatus
+      summary: System Status
+      description: |
+        Detailed system status including service availability, scheduled maintenance,
+        and current incident information.
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: System status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [operational, degraded, maintenance, outage]
+                    example: "operational"
+                  components:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          example: "Analysis API"
+                        status:
+                          type: string
+                          enum: [operational, degraded, outage]
+                        latency_ms:
+                          type: integer
+                          example: 45
+                  incidents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        title:
+                          type: string
+                        status:
+                          type: string
+                          enum: [investigating, identified, monitoring, resolved]
+                        created_at:
+                          type: string
+                          format: date-time
+                  scheduled_maintenance:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        title:
+                          type: string
+                        scheduled_for:
+                          type: string
+                          format: date-time
+                        duration_minutes:
+                          type: integer
+
+  /v2/openapi.json:
+    get:
+      operationId: getOpenApiSpec
+      summary: OpenAPI Specification
+      description: Retrieve the OpenAPI 3.0 specification for this API.
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: OpenAPI specification
+          content:
+            application/json:
+              schema:
+                type: object

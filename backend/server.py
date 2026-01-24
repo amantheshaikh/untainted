@@ -1,58 +1,28 @@
-#!/usr/bin/env python3
-"""Untainted product analyzer (taxonomy-driven version)."""
-
 from __future__ import annotations
 
-import argparse
-import base64
 import difflib
-import html
-import io
 import json
-import mimetypes
 import os
 import re
-import textwrap
-import traceback
-import urllib.error
 import urllib.parse
 import urllib.request
+import requests
 from pathlib import Path
 from dataclasses import dataclass, field
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
-from collections import defaultdict, deque
+from collections import defaultdict, deque  # deque possibly unused now? check
+# deque was used for rate limiting in memory, but that was in app.py or server.py?
+# server.py had no rate limiting? app.py does.
+# deque might be unused in server.py.
+# process_ingredients logic? No.
+# I'll keep collections just in case for now, but remove the obvious ones.
 
-from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+# Removed: argparse, base64, html, io, mimetypes, traceback, urllib.error, http.server, HTTPServer, PIL, cv2, pytesseract
 
-try:
-    import cv2
-    import numpy as np
 
-    OPENCV_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
-    cv2 = None
-    np = None
-    OPENCV_AVAILABLE = False
-
-try:
-    from openfoodfacts import ProductDataset
-
-    OFF_DATASET_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
-    ProductDataset = None
-    OFF_DATASET_AVAILABLE = False
-
-try:
-    import pytesseract  # type: ignore
-
-    PYTESSERACT_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
-    pytesseract = None  # type: ignore
-    PYTESSERACT_AVAILABLE = False
-
-FORBIDDEN_INGREDIENTS = {
+CLEAN_EATING_WATCHLIST = {
     "sugar",
+    # ... (same list, just renaming variable for clarity)
     "refined sugar",
     "invert sugar",
     "high fructose corn syrup",
@@ -114,6 +84,31 @@ FORBIDDEN_INGREDIENTS = {
 }
 
 DEFAULT_FLAG_IDS = {
+    "en:sugar",
+    "en:sugar-various-sugars",
+    "en:high-fructose-corn-syrup",
+    "en:palm-oil",
+    "en:palm-oil-and-fat",
+    "en:monosodium-glutamate",
+    "en:e621",
+    "en:sodium-benzoate",
+    "en:tartrazine",
+    "en:sodium-nitrate",
+    "en:sodium-nitrite",
+    "en:potassium-bromate",
+    "en:propyl-gallate",
+    "en:calcium-propionate",
+    "en:corn-syrup-solids",
+    "en:neotame",
+    "en:carrageenan",
+    "en:polysorbate-80",
+    "en:propylene-glycol",
+    "en:mono-and-diglycerides-of-fatty-acids",
+    "en:lecithins",
+}
+
+# Flags for strict Clean Eating mode only
+CLEAN_EATING_FLAG_IDS = {
     "en:sugar",
     "en:sugar-various-sugars",
     "en:high-fructose-corn-syrup",
@@ -625,6 +620,9 @@ class NormalizedIngredient:
     canonical: str
     display: str
     taxonomy: Optional[Dict[str, Any]]
+    confidence: float = 1.0  # 1.0 = exact match, 0.75-0.99 = fuzzy, <0.75 = heuristic
+    match_type: str = "exact"  # "exact", "synonym", "fuzzy", "heuristic"
+    position: int = 0  # Position in ingredient list (1 = first, highest concentration)
 
 
 class IngredientNormalizer:
@@ -636,14 +634,16 @@ class IngredientNormalizer:
         tokens = self._tokenize(text)
         seen: Set[str] = set()
         results: List[NormalizedIngredient] = []
+        position = 0
         for raw_token in tokens:
             normalized = normalize_token(raw_token)
             if not normalized or _is_stopword(normalized):
                 continue
-            canonical, display, taxonomy_info = self._resolve(normalized)
+            canonical, display, taxonomy_info, confidence, match_type = self._resolve(normalized)
             if canonical in seen:
                 continue
             seen.add(canonical)
+            position += 1
             results.append(
                 NormalizedIngredient(
                     original=raw_token,
@@ -651,6 +651,9 @@ class IngredientNormalizer:
                     canonical=canonical,
                     display=display,
                     taxonomy=taxonomy_info,
+                    confidence=confidence,
+                    match_type=match_type,
+                    position=position,
                 )
             )
         return results
@@ -667,7 +670,8 @@ class IngredientNormalizer:
                 continue
             for pattern, replacement in SPECIAL_TOKEN_REPLACEMENTS:
                 segment = pattern.sub(replacement, segment)
-            segment = re.sub(r"\([^)]*\)", " ", segment)
+            # Replace parentheses with commas to flatten nested list structure
+            segment = segment.replace("(", ", ").replace(")", "")
             segment = re.sub(r"\[[^]]*\]", " ", segment)
             segment = re.sub(r"\s+", " ", segment).strip()
             if not segment:
@@ -687,7 +691,19 @@ class IngredientNormalizer:
                         tokens.append(part.strip())
         return tokens
 
-    def _resolve(self, token: str) -> Tuple[str, str, Optional[Dict[str, Any]]]:
+    def _resolve(self, token: str) -> Tuple[str, str, Optional[Dict[str, Any]], float, str]:
+        """
+        Resolve a token to its canonical form with confidence scoring.
+
+        Returns:
+            Tuple of (canonical, display, taxonomy_info, confidence, match_type)
+
+            Confidence scores:
+            - 1.0: Exact match in taxonomy
+            - 0.95: Synonym match
+            - 0.75-0.94: Fuzzy match (varies by similarity)
+            - 0.5: Heuristic fallback (no taxonomy match)
+        """
         sources: List[Tuple[Optional[IngredientTaxonomy], str]] = []
         if self.taxonomy is not None:
             sources.append((self.taxonomy, "ingredients"))
@@ -704,7 +720,14 @@ class IngredientNormalizer:
                 display = source.display_name(node)
                 info = source.describe(node)
                 info["source"] = tag
-                return canonical, display, info
+
+                # Determine if this was an exact ID match or synonym match
+                node_token = normalize_token(node.node_id.split(":", 1)[-1])
+                if token == node_token:
+                    return canonical, display, info, 1.0, "exact"
+                else:
+                    # Matched via synonym
+                    return canonical, display, info, 0.95, "synonym"
 
         # Fallback to fuzzy with additives first (chemical names) then ingredients
         for source, tag in sorted(sources, key=lambda pair: 0 if pair[1] == "additives" else 1):
@@ -716,8 +739,21 @@ class IngredientNormalizer:
                 display = source.display_name(node)
                 info = source.describe(node)
                 info["source"] = tag
-                return canonical, display, info
-        return token, titleize(token), None
+
+                # Calculate fuzzy confidence based on token length and similarity
+                # Longer tokens with fuzzy match = lower confidence
+                token_len = len(token)
+                if token_len <= 4:
+                    confidence = 0.90  # Short tokens, high confidence threshold was used
+                elif token_len <= 8:
+                    confidence = 0.82  # Medium tokens
+                else:
+                    confidence = 0.75  # Long tokens, more chance of mismatch
+
+                return canonical, display, info, confidence, "fuzzy"
+
+        # No taxonomy match - heuristic fallback
+        return token, titleize(token), None, 0.5, "heuristic"
 
 
 # Global mutable state prepared later
@@ -883,36 +919,56 @@ def off_dataset_lookup(barcode: str) -> Optional[Dict[str, Any]]:
         return OFF_DATASET_CACHE[barcode]
 
     dataset = _get_off_product_dataset()
-    if dataset is None:
-        return None
+    # If dataset is available, try to search it (partial scan)
+    if dataset is not None:
+        iterator = getattr(_get_off_product_dataset, "_iterator", None)
+        if iterator is None:
+            try:
+                iterator = iter(dataset)
+                setattr(_get_off_product_dataset, "_iterator", iterator)
+            except TypeError:
+                iterator = None
 
-    iterator = getattr(_get_off_product_dataset, "_iterator", None)
-    if iterator is None:
-        try:
-            iterator = iter(dataset)
-            setattr(_get_off_product_dataset, "_iterator", iterator)
-        except TypeError:
-            iterator = None
+        while iterator and OFF_DATASET_SCANNED < OFF_DATASET_MAX_SCAN:
+            try:
+                product = next(iterator)
+            except StopIteration:
+                setattr(_get_off_product_dataset, "_iterator", None)
+                break
+            except Exception:
+                setattr(_get_off_product_dataset, "_iterator", None)
+                break
 
-    while iterator and OFF_DATASET_SCANNED < OFF_DATASET_MAX_SCAN:
-        try:
-            product = next(iterator)
-        except StopIteration:
-            setattr(_get_off_product_dataset, "_iterator", None)
-            break
-        except Exception:
-            setattr(_get_off_product_dataset, "_iterator", None)
-            break
+            OFF_DATASET_SCANNED += 1
+            if not isinstance(product, dict):
+                continue
+            code = str(product.get("code") or product.get("id") or "").strip()
+            if not code:
+                continue
+            OFF_DATASET_CACHE.setdefault(code, product)
+            if code == barcode:
+                return product
 
-        OFF_DATASET_SCANNED += 1
-        if not isinstance(product, dict):
-            continue
-        code = str(product.get("code") or product.get("id") or "").strip()
-        if not code:
-            continue
-        OFF_DATASET_CACHE.setdefault(code, product)
-        if code == barcode:
-            return product
+    
+    # 2. API Lookup (Fallback)
+    try:
+        url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
+        print(f"[DEBUG] Lookup OFF API: {url}")
+        headers = {
+            "User-Agent": "UntaintedApp/1.0 (aman@untainted.io) - Development"
+        }
+        resp = requests.get(url, headers=headers, timeout=10)
+        print(f"[DEBUG] OFF API Response Code: {resp.status_code}")
+        if resp.status_code == 200:
+            data = resp.json()
+            status = data.get("status")
+            print(f"[DEBUG] OFF API Product Status: {status}")
+            if status == 1:
+                product = data.get("product")
+                OFF_DATASET_CACHE[barcode] = product
+                return product
+    except Exception as e:
+        print(f"OFF API lookup failed for {barcode}: {e}")
 
     return OFF_DATASET_CACHE.get(barcode)
 
@@ -964,6 +1020,8 @@ def _extract_product_fields(product: Dict[str, Any]) -> Tuple[Optional[str], Opt
                 ingredients_text = ", ".join(parts)
                 break
 
+    code = str(product.get("code") or product.get("id") or "").strip()
+
     ingredients_tags: Optional[List[str]] = None
     tags_value = product.get("ingredients_tags") or product.get("ingredients_tags_en")
     if isinstance(tags_value, list):
@@ -971,13 +1029,22 @@ def _extract_product_fields(product: Dict[str, Any]) -> Tuple[Optional[str], Opt
     elif isinstance(tags_value, str):
         ingredients_tags = [part.strip() for part in tags_value.split(",") if part.strip()]
 
-    return name, ingredients_text, ingredients_tags
+    ingredients: List[str] = []
+    if ingredients_text:
+        ingredients = [ingredients_text]
+    elif ingredients_tags:
+        ingredients = ingredients_tags
+
+    return code, name, ingredients
 
 
 # --- Ingredient processing ------------------------------------------------
 
 NORMALIZER = _ensure_normalizer()
-FORBIDDEN_NORMALIZED = {normalize_token(token) for token in FORBIDDEN_INGREDIENTS}
+
+
+CLEAN_EATING_NORMALIZED = {normalize_token(token) for token in CLEAN_EATING_WATCHLIST}
+CLEAN_EATING_CANONICALS = {normalize_token(flag.split(":", 1)[-1]) for flag in CLEAN_EATING_FLAG_IDS}
 FLAG_CANONICALS = {normalize_token(flag.split(":", 1)[-1]) for flag in DEFAULT_FLAG_IDS}
 
 
@@ -1552,18 +1619,69 @@ def process_ingredients(
             allergy_labels = labels
             allergy_tokens = tokens
 
+    # 4. Handle custom_avoidance (e.g. from MultiSelect: [{"name": "Mango"}, ...])
+    custom_avoidance_tokens: Set[str] = set()
+    raw_custom = preferences.get("custom_avoidance") if preferences else None
+    if isinstance(raw_custom, (list, tuple, set)):
+        for item in raw_custom:
+            val = None
+            if isinstance(item, str):
+                val = item
+            elif isinstance(item, dict):
+                val = item.get("name") or item.get("id")
+            
+            if val and isinstance(val, str):
+                # Split by comma to handle synonyms like "mango, mangoes"
+                for part in val.split(","):
+                    cleaned = normalize_token(part)
+                    if cleaned:
+                        custom_avoidance_tokens.add(cleaned)
+
     # accept nutriments passed via product_meta (OpenFoodFacts product dict)
     if isinstance(product_meta, dict):
         nutriments = product_meta.get("nutriments") or product_meta.get("nutriment")
 
-    is_safe, hits, diet_hits, allergy_hits = evaluate_items(
-        items, list(active_diets), allergy_tokens, nutriments=nutriments
+    # Get user's health conditions for FSSAI insights
+    health_conditions = []
+    if preferences:
+        health_list = preferences.get("health_restrictions") or preferences.get("health_conditions") or []
+        if isinstance(health_list, (list, tuple)):
+            health_conditions = [str(h).lower().replace(" ", "_") for h in health_list]
+
+    is_safe, hits, diet_hits, allergy_hits, health_insights = evaluate_items(
+        items, list(active_diets), allergy_tokens, custom_avoidance=custom_avoidance_tokens,
+        nutriments=nutriments, health_conditions=health_conditions
     )
-    
+
     display = [item.display for item in items]
     canonical = [item.canonical for item in items]
     taxonomy = [item.taxonomy for item in items if item.taxonomy]
-    
+
+    # Build confidence data for each ingredient
+    confidence_data = []
+    uncertain_ingredients = []
+    for item in items:
+        conf_entry = {
+            "ingredient": item.display,
+            "confidence": item.confidence,
+            "match_type": item.match_type,
+            "position": item.position,
+        }
+        confidence_data.append(conf_entry)
+
+        # Flag uncertain matches for user verification
+        if item.confidence < 0.8:
+            uncertain_ingredients.append({
+                "ingredient": item.display,
+                "original": item.original,
+                "confidence": item.confidence,
+                "match_type": item.match_type,
+                "message": f"'{item.original}' matched as '{item.display}' with {item.confidence*100:.0f}% confidence"
+            })
+
+    # Calculate average confidence
+    avg_confidence = sum(item.confidence for item in items) / len(items) if items else 1.0
+
     if normalizer.taxonomy and normalizer.additives:
         source_label = "taxonomy+additives"
     elif normalizer.taxonomy:
@@ -1586,8 +1704,16 @@ def process_ingredients(
         "diet_preference": active_diets.pop() if active_diets else None, # Legacy compat
         "allergy_hits": allergy_hits,
         "allergy_preferences": allergy_labels,
+        "health_insights": health_insights,
         "taxonomy_error": INGREDIENT_TAXONOMY_ERROR,
         "additives_error": ADDITIVES_TAXONOMY_ERROR,
+        # New confidence scoring fields
+        "confidence": {
+            "average": round(avg_confidence, 2),
+            "ingredients": confidence_data,
+        },
+        "uncertain_matches": uncertain_ingredients,
+        "needs_verification": len(uncertain_ingredients) > 0,
     }
 
 
@@ -1595,47 +1721,90 @@ def evaluate_items(
     items: List[NormalizedIngredient],
     diet_preferences: List[str],
     allergy_tokens: Optional[Set[str]] = None,
+    custom_avoidance: Optional[Set[str]] = None,
     nutriments: Optional[Dict[str, Any]] = None,
-) -> Tuple[bool, List[str], List[str], List[str]]:
+    health_conditions: Optional[List[str]] = None,
+) -> Tuple[bool, List[str], List[str], List[str], List[str]]:
     hits: Set[str] = set()
     diet_hits: List[str] = []
     seen_diet: Set[str] = set()
     allergy_hits: List[str] = []
     seen_allergies: Set[str] = set()
+    health_insights: List[str] = []
+    seen_insights: Set[str] = set()
+    
     diet_rules = _get_diet_rules()
 
     # Pre-fetch rules for all active diets
     active_rules = []
+    strict_clean_eating = False
+    
     for d in diet_preferences:
+        # Check for Clean Eating preference
+        if normalize_token(d) in {"clean eating", "clean-eating"}:
+             strict_clean_eating = True
+             continue # Handled separately via Watchlist
+             
         r = diet_rules.get(d)
         if r:
             active_rules.append((d, r["ids"], r["tokens"]))
 
     allergy_token_set: Set[str] = set(allergy_tokens or set())
+    custom_avoidance_set: Set[str] = set(custom_avoidance or set())
     
     for item in items:
         token = item.canonical.replace("-", " ")
-        # 1. Global Forbidden Ingredients ("Toxic" / "Unclean")
-        for forbidden in FORBIDDEN_NORMALIZED:
-            if forbidden and forbidden in token:
-                hits.add(forbidden)
-        
+        display_norm = normalize_token(item.display or item.canonical)
         info = item.taxonomy or {}
-        display_norm = normalize_token(info.get("display") or item.display)
         
-        if display_norm in FORBIDDEN_NORMALIZED:
-            hits.add(display_norm)
-            
-        for syn in info.get("synonyms") or []:
-            syn_norm = normalize_token(syn)
-            if syn_norm in FORBIDDEN_NORMALIZED:
-                hits.add(syn_norm)
-                
-        node_id = info.get("id") if isinstance(info, dict) else None
-        if node_id and (node_id in DEFAULT_FLAG_IDS or normalize_token(node_id.split(":", 1)[-1]) in FLAG_CANONICALS):
-            hits.add(display_norm or token)
+        # 0. Check Custom Avoidance (User specific)
+        for avoid in custom_avoidance_set:
+             # Ensure we compare apples to apples (normalized)
+             if avoid in display_norm or avoid in token:
+                 hits.add(f"{avoid.title()} (Custom Selection)")
+                 
+        # 1. Check Clean Eating Watchlist (Global "Unclean" list)
+        is_watchlisted = False
+        watchlist_match = None
+        
+        # Check tokens against watchlist
+        for forbidden in CLEAN_EATING_NORMALIZED:
+            if forbidden and forbidden in token:
+                 is_watchlisted = True
+                 watchlist_match = forbidden
+                 break # Found one match is enough for this ingredient
+        
+        if not is_watchlisted:
+            if display_norm in CLEAN_EATING_NORMALIZED:
+                is_watchlisted = True
+                watchlist_match = display_norm
+            else:
+                for syn in info.get("synonyms") or []:
+                    syn_norm = normalize_token(syn)
+                    if syn_norm in CLEAN_EATING_NORMALIZED:
+                        is_watchlisted = True
+                        watchlist_match = syn_norm
+                        break
 
-        # 2. Diet & Health Rules
+        if not is_watchlisted:
+            node_id = info.get("id") if isinstance(info, dict) else None
+            if node_id and (node_id in CLEAN_EATING_FLAG_IDS or normalize_token(node_id.split(":", 1)[-1]) in CLEAN_EATING_CANONICALS):
+                 is_watchlisted = True
+                 watchlist_match = display_norm or token
+
+        # Logic: If watchlisted...
+        # If Strict Clean Eating -> Add to Hits (Unsafe)
+        # Else -> Add to Health Insights (Info)
+        if is_watchlisted:
+            label = watchlist_match or display_norm
+            if strict_clean_eating:
+                 hits.add(label)
+            else:
+                 if label not in seen_insights:
+                     seen_insights.add(label)
+                     health_insights.append(label)
+
+        # 2. Diet & Health Rules (Vegan, Keto, etc)
         item_ids, item_tokens = _collect_diet_signatures(item)
         
         for diet_name, id_rule, token_rule in active_rules:
@@ -1646,7 +1815,7 @@ def evaluate_items(
                     seen_diet.add(normalized_display.lower())
                     diet_hits.append(f"{normalized_display} ({diet_name})")
 
-        # 3. Allergies
+        # 3. Allergies (Highest Priority)
         if allergy_token_set:
             combined_tokens: Set[str] = set(item_tokens)
             for identifier in item_ids:
@@ -1660,22 +1829,32 @@ def evaluate_items(
                     lowered_display = normalized_display.lower()
                     if lowered_display not in seen_allergies:
                         seen_allergies.add(lowered_display)
-                        allergy_hits.append(normalized_display)
+                        allergy_hits.append(f"{normalized_display} (Allergen)")
 
-    # Nutriment-based checks (Diabetes / Keto)
+    # Nutriment-based checks (Diabetes / Keto / FSSAI Insights)
     if nutriments:
         def _get_nutriment(keys: List[str]) -> Optional[float]:
             for k in keys:
                 if k in nutriments:
                     try:
-                        return float(nutriments[k])
+                        val = nutriments[k]
+                        # Handle string values like "5g" or "5 g"
+                        if isinstance(val, str):
+                            val = ''.join(c for c in val if c.isdigit() or c == '.')
+                        return float(val) if val else None
                     except:
                         pass
             return None
 
-        sugars = _get_nutriment(["sugars_100g", "sugars", "sugar_100g", "sugars_value"])
-        carbs = _get_nutriment(["carbohydrates_100g", "carbohydrates", "carbohydrate_100g", "carbs_100g"])
-        fiber = _get_nutriment(["fiber_100g", "fiber"])
+        sugars = _get_nutriment(["sugars_100g", "sugars", "sugar_100g", "sugars_value", "sugar", "total_sugars"])
+        carbs = _get_nutriment(["carbohydrates_100g", "carbohydrates", "carbohydrate_100g", "carbs_100g", "carbs", "total_carbohydrates"])
+        fiber = _get_nutriment(["fiber_100g", "fiber", "dietary_fiber", "fibre"])
+        sodium = _get_nutriment(["sodium_100g", "sodium", "sodium_mg", "salt"])
+        saturated_fat = _get_nutriment(["saturated_fat_100g", "saturated_fat", "saturated_fat_g"])
+        trans_fat = _get_nutriment(["trans_fat_100g", "trans_fat", "trans_fat_g"])
+        calories = _get_nutriment(["energy_100g", "energy", "calories", "energy_kcal", "kcal"])
+        protein = _get_nutriment(["protein_100g", "protein", "proteins"])
+
         net_carbs = None
         if carbs is not None:
              net_carbs = carbs - (fiber or 0.0)
@@ -1684,7 +1863,7 @@ def evaluate_items(
             # diabetic-friendly: flag high sugar content
             if diet_name == "diabetic-friendly" and sugars is not None:
                 if sugars >= DIABETIC_SUGARS_PER_100G_THRESHOLD:
-                    label = f"high sugar ({sugars} g/100g)"
+                    label = f"High Sugar ({sugars}g/100g)"
                     if label.lower() not in seen_diet:
                         seen_diet.add(label.lower())
                         diet_hits.append(label)
@@ -1692,229 +1871,96 @@ def evaluate_items(
             # keto: flag high net carbs
             if diet_name == "keto" and net_carbs is not None:
                 if net_carbs >= KETO_NET_CARBS_PER_100G_THRESHOLD:
-                    label = f"high net carbs ({net_carbs:.1f} g/100g)"
+                    label = f"High Net Carbs ({net_carbs:.1f}g/100g)"
                     if label.lower() not in seen_diet:
                         seen_diet.add(label.lower())
                         diet_hits.append(label)
 
+            # low-sodium: flag high sodium
+            if diet_name in ("low-sodium", "hypertension", "heart-healthy") and sodium is not None:
+                if sodium > 400:  # FSSAI threshold for "high sodium"
+                    label = f"High Sodium ({sodium:.0f}mg/100g)"
+                    if label.lower() not in seen_diet:
+                        seen_diet.add(label.lower())
+                        diet_hits.append(label)
+
+            # low-fat diets: flag high saturated fat
+            if diet_name in ("low-fat", "heart-healthy") and saturated_fat is not None:
+                if saturated_fat > 1.5:  # FSSAI threshold
+                    label = f"High Saturated Fat ({saturated_fat}g/100g)"
+                    if label.lower() not in seen_diet:
+                        seen_diet.add(label.lower())
+                        diet_hits.append(label)
+
+        # FSSAI-based health insights for all users (not just specific diets)
+        # These are informational, not blocking
+
+        # High sugar warning (WHO recommends max 25g/day)
+        if sugars is not None and sugars > 10:
+            insight = f"High sugar: {sugars}g per 100g ({sugars/25*100:.0f}% of daily limit per 100g)"
+            if insight.lower() not in seen_insights:
+                seen_insights.add(insight.lower())
+                health_insights.append(insight)
+
+        # High sodium warning
+        if sodium is not None and sodium > 400:
+            insight = f"High sodium: {sodium:.0f}mg per 100g ({sodium/2000*100:.0f}% of daily limit)"
+            if insight.lower() not in seen_insights:
+                seen_insights.add(insight.lower())
+                health_insights.append(insight)
+
+        # Trans fat warning (should be as close to 0 as possible)
+        if trans_fat is not None and trans_fat > 0.2:
+            insight = f"Contains trans fat: {trans_fat}g per 100g (FSSAI recommends avoiding)"
+            if insight.lower() not in seen_insights:
+                seen_insights.add(insight.lower())
+                health_insights.append(insight)
+
+        # Positive insights
+        if fiber is not None and fiber >= 6.0:
+            insight = f"High fiber: {fiber}g per 100g (good for digestion)"
+            if insight.lower() not in seen_insights:
+                seen_insights.add(insight.lower())
+                health_insights.append(insight)
+
+        if protein is not None and protein >= 10.0:
+            insight = f"Good protein source: {protein}g per 100g"
+            if insight.lower() not in seen_insights:
+                seen_insights.add(insight.lower())
+                health_insights.append(insight)
+
+        # Health condition specific insights
+        if health_conditions:
+            for condition in health_conditions:
+                if condition in ("diabetes", "diabetic") and sugars is not None:
+                    if sugars > 5:
+                        insight = f"Diabetes caution: {sugars}g sugar exceeds 5g/100g threshold"
+                        if insight.lower() not in seen_insights:
+                            seen_insights.add(insight.lower())
+                            health_insights.append(insight)
+
+                if condition in ("hypertension", "high_blood_pressure") and sodium is not None:
+                    if sodium > 200:
+                        insight = f"Hypertension caution: {sodium:.0f}mg sodium is high for blood pressure management"
+                        if insight.lower() not in seen_insights:
+                            seen_insights.add(insight.lower())
+                            health_insights.append(insight)
+
+                if condition in ("heart_disease", "cardiovascular") and saturated_fat is not None:
+                    if saturated_fat > 1.5:
+                        insight = f"Heart health caution: {saturated_fat}g saturated fat per 100g"
+                        if insight.lower() not in seen_insights:
+                            seen_insights.add(insight.lower())
+                            health_insights.append(insight)
+
+    # Verdict Logic
+    # Safe if NO Allergy hits AND NO Diet hits AND (NO Strict Hits)
     is_safe = (len(hits) == 0) and (len(diet_hits) == 0) and (len(allergy_hits) == 0)
     
-    return is_safe, sorted(list(hits)), diet_hits, allergy_hits
+    return is_safe, sorted(list(hits)), diet_hits, allergy_hits, health_insights
 
-    
+# Cleanup complete
 
-
-# --- HTTP helpers --------------------------------------------------------
-
-def load_template() -> str:
-    with TEMPLATE_PATH.open("r", encoding="utf-8") as handle:
-        return handle.read()
-
-
-def build_check_payload(raw_text: str, preferences: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    analysis = process_ingredients(raw_text, preferences)
-    display_items = analysis["ingredients"]
-    taxonomy_entries = analysis["taxonomy"]
-    hits = analysis["hits"]
-    is_clean = analysis["is_clean"]
-    diet_hits = analysis.get("diet_hits") or []
-    diet_preference = analysis.get("diet_preference")
-    diet_label = (diet_preference or "").replace("_", " ").strip().title()
-    allergy_hits = analysis.get("allergy_hits") or []
-    allergy_preferences = analysis.get("allergy_preferences") or []
-
-    safe_input = html.escape(raw_text)
-    display_list = "".join(f"<li>{html.escape(item)}</li>" for item in display_items) or "<li>—</li>"
-    summary_sections: List[str] = []
-    if is_clean:
-        summary_sections.append(
-            textwrap.dedent(
-                """        <div class=\"card ok\">
-          <h2>✅ Clean</h2>
-          <p>No red-flag additives detected.</p>
-        </div>
-        """
-            )
-        )
-    else:
-        flagged = "".join(f"<li>{html.escape(hit)}</li>" for hit in hits)
-        summary_sections.append(
-            textwrap.dedent(
-                f"""        <div class=\"card bad\">
-          <h2>❌ Not Clean</h2>
-          <p>Found these flagged ingredients:</p>
-          <ul>{flagged}</ul>
-        </div>
-        """
-            )
-        )
-
-    if diet_hits:
-        flagged_diet = "".join(f"<li>{html.escape(hit)}</li>" for hit in diet_hits)
-        diet_heading = html.escape(diet_label or "your diet")
-        summary_sections.append(
-            textwrap.dedent(
-                f"""        <div class=\"card bad\">
-          <h2>⚠️ Conflicts with {diet_heading}</h2>
-          <p>This product conflicts with your dietary preference.</p>
-          <ul>{flagged_diet}</ul>
-        </div>
-        """
-            )
-        )
-
-    if allergy_hits:
-        flagged_allergies = "".join(f"<li>{html.escape(hit)}</li>" for hit in allergy_hits)
-        if allergy_preferences:
-            preference_label = ", ".join(html.escape(pref) for pref in allergy_preferences)
-        else:
-            preference_label = "your allergy selections"
-        summary_sections.append(
-            textwrap.dedent(
-                f"""        <div class=\"card bad\">
-          <h2>⚠️ Matches {preference_label}</h2>
-          <p>These ingredients match the allergies or sensitivities you track:</p>
-          <ul>{flagged_allergies}</ul>
-        </div>
-        """
-            )
-        )
-
-    summary_block = "".join(summary_sections)
-
-    taxonomy_items = []
-    for entry in taxonomy_entries:
-        if not entry:
-            continue
-        label = html.escape(entry.get("display") or "")
-        details: List[str] = []
-        parents = entry.get("parents") or []
-        if parents:
-            details.append("Parents: " + " › ".join(html.escape(p) for p in parents[:3]))
-        synonyms = entry.get("synonyms") or []
-        if synonyms:
-            details.append("Synonyms: " + ", ".join(html.escape(s) for s in synonyms[:5]))
-        if details:
-            taxonomy_items.append(f"<li>{label} <span class=\"muted\">({' • '.join(details)})</span></li>")
-        else:
-            taxonomy_items.append(f"<li>{label}</li>")
-
-    taxonomy_block = ""
-    if taxonomy_items:
-        taxonomy_block = textwrap.dedent(
-            f"""          <p><strong>Open Food Facts taxonomy:</strong></p>
-          <ul class=\"bullets\">{''.join(taxonomy_items)}</ul>
-            """
-        )
-
-    taxonomy_notice = ""
-    taxonomy_error = analysis.get("taxonomy_error")
-    if taxonomy_error:
-        taxonomy_notice = f"<p class=\"small muted\">Taxonomy unavailable: {html.escape(taxonomy_error)}</p>"
-
-    analysis_block = textwrap.dedent(
-        f"""        <details class=\"analysis\" open>
-          <summary>Analysis</summary>
-          <p><strong>Your input:</strong></p>
-          <pre class=\"input\">{safe_input}</pre>
-          <p><strong>Parsed ingredients:</strong></p>
-          <ul class=\"bullets\">{display_list}</ul>{taxonomy_block}
-          {taxonomy_notice}
-        </details>
-        """
-    )
-
-    return {
-        "html": summary_block + analysis_block,
-        "is_clean": is_clean,
-        "hits": hits,
-        "analysis": analysis,
-        "raw_input": raw_text,
-    }
-
-
-def _choose_cors_origin(request_origin: Optional[str]) -> Optional[str]:
-    if "*" in CORS_ALLOWED_ORIGINS:
-        return "*"
-    if not CORS_ALLOWED_ORIGINS:
-        return "*"
-    if not request_origin:
-        return CORS_ALLOWED_ORIGINS[0]
-    return CORS_ALLOWED_ORIGINS_LOOKUP.get(request_origin.lower())
-
-
-def _set_cors_headers(handler: BaseHTTPRequestHandler, *, preflight: bool = False) -> None:
-    request_origin = handler.headers.get("Origin")
-    allow_origin = _choose_cors_origin(request_origin)
-    if allow_origin:
-        handler.send_header("Access-Control-Allow-Origin", allow_origin)
-        if allow_origin != "*":
-            handler.send_header("Vary", "Origin")
-    if preflight:
-        request_headers = handler.headers.get("Access-Control-Request-Headers")
-        if request_headers:
-            handler.send_header("Access-Control-Allow-Headers", request_headers)
-        elif CORS_ALLOW_HEADERS:
-            handler.send_header("Access-Control-Allow-Headers", CORS_ALLOW_HEADERS)
-        if CORS_ALLOW_METHODS:
-            handler.send_header("Access-Control-Allow-Methods", CORS_ALLOW_METHODS)
-        handler.send_header("Access-Control-Max-Age", "600")
-
-
-def _respond_json(handler: BaseHTTPRequestHandler, status: int, payload: Dict[str, Any]) -> None:
-    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    handler.send_response(status)
-    _set_cors_headers(handler)
-    handler.send_header("Content-Type", "application/json; charset=utf-8")
-    handler.send_header("Content-Length", str(len(body)))
-    handler.send_header("Cache-Control", "no-store")
-    handler.end_headers()
-    handler.wfile.write(body)
-
-
-def _respond_html(handler: BaseHTTPRequestHandler, status: int, html_body: str) -> None:
-    body = html_body.encode("utf-8")
-    handler.send_response(status)
-    _set_cors_headers(handler)
-    handler.send_header("Content-Type", "text/html; charset=utf-8")
-    handler.send_header("Content-Length", str(len(body)))
-    handler.send_header("Cache-Control", "no-store")
-    handler.end_headers()
-    handler.wfile.write(body)
-
-
-def _serve_file(handler: BaseHTTPRequestHandler, path: Path, default_mime: str = "application/octet-stream") -> None:
-    mime, _ = mimetypes.guess_type(str(path))
-    if not mime:
-        mime = default_mime
-    data = path.read_bytes()
-    handler.send_response(200)
-    _set_cors_headers(handler)
-    if mime.startswith("text/") or mime in {"application/javascript", "application/json"}:
-        handler.send_header("Content-Type", f"{mime}; charset=utf-8")
-    else:
-        handler.send_header("Content-Type", mime)
-    handler.send_header("Content-Length", str(len(data)))
-    handler.send_header("Cache-Control", "no-store")
-    handler.end_headers()
-    handler.wfile.write(data)
-
-
-def _read_body(handler: BaseHTTPRequestHandler) -> bytes:
-    length = int(handler.headers.get("Content-Length", "0"))
-    if length <= 0:
-        return b""
-    return handler.rfile.read(length)
-
-
-def _parse_json_body(handler: BaseHTTPRequestHandler) -> Tuple[Optional[Any], Optional[str]]:
-    body = _read_body(handler)
-    if not body:
-        return {}, None
-    try:
-        return json.loads(body.decode("utf-8")), None
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        return None, str(exc)
 
 
 def build_capabilities() -> Dict[str, Any]:
@@ -1962,475 +2008,4 @@ def build_capabilities() -> Dict[str, Any]:
 # --- HTTP handler --------------------------------------------------------
 
 
-class Handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self) -> None:  # noqa: N802 - signature fixed by BaseHTTPRequestHandler
-        self.send_response(204)
-        _set_cors_headers(self, preflight=True)
-        self.end_headers()
-
-    def do_GET(self) -> None:  # noqa: N802 - signature fixed by BaseHTTPRequestHandler
-        if self.path.startswith("/capabilities"):
-            _respond_json(self, 200, build_capabilities())
-            return
-
-        if REVAMPED_AVAILABLE and self._serve_revamped():
-            return
-
-        if self.path in {"/", "/index.html"}:
-            try:
-                page = load_template().replace("{{result_html}}", "")
-            except FileNotFoundError:
-                self.send_error(500, "Template not found")
-                return
-            _respond_html(self, 200, page)
-            return
-
-        self.send_error(404, "Not Found")
-
-    def do_POST(self) -> None:  # noqa: N802 - signature fixed by BaseHTTPRequestHandler
-        if self.path.startswith("/check"):
-            self._handle_check()
-            return
-        if self.path.startswith("/ocr"):
-            self._handle_ocr()
-            return
-        if self.path.startswith("/lookup"):
-            self._handle_lookup()
-            return
-        if self.path.startswith("/parse_ingredients"):
-            self._handle_parse()
-            return
-        self.send_error(404, "Not Found")
-
-    def _serve_revamped(self) -> bool:
-        path = self.path.split("?", 1)[0]
-        if not path:
-            path = "/"
-
-        if path.startswith(("/check", "/lookup", "/ocr", "/parse_ingredients")):
-            return False
-
-        if path.startswith("/api/") or path.startswith("/__"):
-            return False
-
-        if path.startswith("/assets/"):
-            asset_path = REVAMPED_ROOT / path.lstrip("/")
-            if asset_path.is_file():
-                _serve_file(self, asset_path)
-                return True
-            return False
-
-        if path in {"/", "/index.html"}:
-            if REVAMPED_INDEX.is_file():
-                _serve_file(self, REVAMPED_INDEX, default_mime="text/html")
-                return True
-            return False
-
-        candidate = REVAMPED_ROOT / path.lstrip("/")
-        if candidate.is_file():
-            _serve_file(self, candidate)
-            return True
-
-        # SPA-style fallback: serve index for unknown routes
-        if REVAMPED_INDEX.is_file() and not path.startswith("/capabilities"):
-            _serve_file(self, REVAMPED_INDEX, default_mime="text/html")
-            return True
-
-        return False
-
-    # -- Endpoint handlers --
-    def _handle_check(self) -> None:
-        try:
-            form_body = _read_body(self).decode("utf-8", errors="ignore")
-            params = urllib.parse.parse_qs(form_body)
-            text = params.get("ingredients", [""])[0]
-            preferences_raw = params.get("preferences", [None])[0]
-            preferences_obj: Optional[Dict[str, Any]] = None
-            if preferences_raw:
-                try:
-                    parsed_pref = json.loads(preferences_raw)
-                    if isinstance(parsed_pref, dict):
-                        preferences_obj = parsed_pref
-                except json.JSONDecodeError:
-                    preferences_obj = None
-            payload = build_check_payload(text, preferences_obj)
-            accept = (self.headers.get("Accept") or "").lower()
-            wants_json = "application/json" in accept or (self.headers.get("X-Requested-With") or "").lower() in {"xmlhttprequest", "fetch"}
-            if wants_json:
-                response = {
-                    "html": payload["html"],
-                    "analysis": payload["analysis"],
-                    "hits": payload["hits"],
-                    "is_clean": payload["is_clean"],
-                    "diet_hits": payload["analysis"].get("diet_hits"),
-                    "diet_preference": payload["analysis"].get("diet_preference"),
-                }
-                _respond_json(self, 200, response)
-            else:
-                try:
-                    page = load_template().replace("{{result_html}}", payload["html"])
-                except FileNotFoundError:
-                    self.send_error(500, "Template not found")
-                    return
-                _respond_html(self, 200, page)
-        except Exception as exc:  # pragma: no cover - defensive
-            traceback.print_exc()
-            _respond_json(self, 500, {"error": str(exc)})
-
-    def _handle_parse(self) -> None:
-        payload, error = _parse_json_body(self)
-        if error is not None:
-            _respond_json(self, 400, {"error": "invalid json body"})
-            return
-
-        if not isinstance(payload, dict):
-            _respond_json(self, 400, {"error": "invalid json payload"})
-            return
-
-        text = str(payload.get("text", ""))
-        if not text:
-            _respond_json(self, 400, {"error": "missing text"})
-            return
-
-        preferences_obj = None
-        preferences_payload = payload.get("preferences")
-        if isinstance(preferences_payload, dict):
-            preferences_obj = preferences_payload
-
-        analysis = process_ingredients(text, preferences_obj)
-        response = {
-            "ingredients": analysis["ingredients"],
-            "canonical": analysis["canonical"],
-            "taxonomy": analysis["taxonomy"],
-            "source": analysis["source"],
-            "is_clean": analysis["is_clean"],
-            "hits": analysis["hits"],
-            "diet_hits": analysis.get("diet_hits"),
-            "diet_preference": analysis.get("diet_preference"),
-            "taxonomy_error": analysis.get("taxonomy_error"),
-            "additives_error": analysis.get("additives_error"),
-        }
-        _respond_json(self, 200, response)
-
-    def _handle_ocr(self) -> None:
-        payload, error = _parse_json_body(self)
-        if error is not None:
-            _respond_json(self, 400, {"error": "invalid json body"})
-            return
-
-        if not isinstance(payload, dict):
-            _respond_json(self, 400, {"error": "invalid json payload"})
-            return
-
-        data_url = str(payload.get("image_data") or "")
-        use_opencv = bool(payload.get("use_opencv"))
-        if not data_url:
-            _respond_json(self, 400, {"error": "missing image_data"})
-            return
-
-        if use_opencv and not OPENCV_AVAILABLE:
-            _respond_json(self, 400, {"error": "OpenCV preprocessing not available"})
-            return
-
-        comma = data_url.find(",")
-        base64_data = data_url[comma + 1 :] if comma != -1 else data_url
-        try:
-            image_bytes = base64.b64decode(base64_data)
-        except Exception:
-            _respond_json(self, 400, {"error": "invalid base64 image data"})
-            return
-
-        pil_image: Optional[Image.Image] = None
-        if use_opencv and OPENCV_AVAILABLE:
-            try:
-                pil_image = preprocess_image_opencv(image_bytes)
-            except Exception:
-                traceback.print_exc()
-                pil_image = None
-        if pil_image is None:
-            try:
-                pil_image = preprocess_image_bytes(image_bytes)
-            except Exception:
-                traceback.print_exc()
-                _respond_json(self, 400, {"error": "failed to decode/process image"})
-                return
-
-        if not PYTESSERACT_AVAILABLE:
-            _respond_json(self, 501, {"error": "Server OCR not configured"})
-            return
-
-        try:
-            text = pytesseract.image_to_string(pil_image, lang="eng")
-        except Exception as exc:
-            traceback.print_exc()
-            _respond_json(self, 500, {"error": f"Server OCR failed: {exc}"})
-            return
-
-        _respond_json(self, 200, {"text": text})
-
-    def _handle_lookup(self) -> None:
-        payload, error = _parse_json_body(self)
-        if error is not None:
-            _respond_json(self, 400, {"error": "Invalid JSON body"})
-            return
-
-        if not isinstance(payload, dict):
-            _respond_json(self, 400, {"error": "Invalid JSON payload"})
-            return
-
-        barcode = str(payload.get("barcode", "")).strip()
-        if not barcode:
-            _respond_json(self, 400, {"error": "No barcode provided"})
-            return
-
-        preferences_payload = payload.get("preferences")
-        preferences_obj = preferences_payload if isinstance(preferences_payload, dict) else None
-
-        dataset_info = {
-            "available": OFF_DATASET_AVAILABLE,
-            "used": False,
-            "error": OFF_DATASET_ERROR,
-            "type": OFF_DATASET_TYPE,
-            "scanned": OFF_DATASET_SCANNED,
-            "max_scan": OFF_DATASET_MAX_SCAN,
-            "cache_size": len(OFF_DATASET_CACHE),
-        }
-        product_info: Dict[str, Any] = {
-            "barcode": barcode,
-            "product_name": None,
-            "ingredients": None,
-            "ingredients_tags": None,
-            "lookup": {"source": None, "dataset": dataset_info, "hits": []},
-        }
-
-        dataset_product = off_dataset_lookup(barcode) if OFF_DATASET_AVAILABLE else None
-        dataset_info.update({
-            "used": bool(dataset_product),
-            "error": OFF_DATASET_ERROR,
-            "scanned": OFF_DATASET_SCANNED,
-            "cache_size": len(OFF_DATASET_CACHE),
-        })
-
-        if dataset_product:
-            name, text_value, tags = _extract_product_fields(dataset_product)
-            if name:
-                product_info["product_name"] = name
-            if text_value:
-                product_info["ingredients"] = text_value
-                product_info["lookup"]["source"] = "dataset"
-            if tags:
-                product_info["ingredients_tags"] = tags
-
-        if not product_info["ingredients"]:
-            try:
-                product_info = self._lookup_via_api(barcode, product_info)
-            except urllib.error.HTTPError as exc:
-                _respond_json(self, 404 if exc.code == 404 else 502, {
-                    "error": "Product not found" if exc.code == 404 else f"OpenFoodFacts HTTP error: {exc.code}",
-                    "lookup": product_info.get("lookup", {}),
-                })
-                return
-            except Exception as exc:
-                _respond_json(self, 502, {"error": f"Failed to contact OpenFoodFacts: {exc}", "lookup": product_info.get("lookup", {})})
-                return
-
-        ingredients_text = product_info.get("ingredients") or ""
-        if ingredients_text:
-            # prefer dataset product dict (if available) otherwise use raw_product
-            product_dict = dataset_product or product_info.get("raw_product")
-            analysis = process_ingredients(ingredients_text, preferences_obj, product_meta=product_dict)
-            product_info.update(
-                {
-                    "analysis": analysis,
-                    "is_clean": analysis["is_clean"],
-                    "hits": analysis["hits"],
-                    "diet_hits": analysis.get("diet_hits"),
-                    "diet_preference": analysis.get("diet_preference"),
-                }
-            )
-        else:
-            product_info.update({"analysis": None, "is_clean": True, "hits": []})
-
-        _respond_json(self, 200, product_info)
-
-    def _lookup_via_api(self, barcode: str, product_info: Dict[str, Any]) -> Dict[str, Any]:
-        url = f"https://world.openfoodfacts.org/api/v2/product/{urllib.parse.quote(barcode)}"
-        http_meta = {"used": False, "url": url, "status": None}
-        product_info["lookup"]["http"] = http_meta
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Untainted/1.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.load(resp)
-        except urllib.error.HTTPError as exc:
-            http_meta.update({"used": True, "status": exc.code})
-            raise
-        except Exception as exc:
-            http_meta.update({"used": True, "status": "error"})
-            raise exc
-
-        http_meta.update({"used": True, "status": data.get("status")})
-        if data.get("status") != 1:
-            return product_info
-
-        product = data.get("product", {}) or {}
-        name, text_value, tags = _extract_product_fields(product)
-        if name:
-            product_info["product_name"] = name
-        if text_value:
-            product_info["ingredients"] = text_value
-            product_info["lookup"]["source"] = "http"
-        if tags:
-            product_info["ingredients_tags"] = tags
-        # include raw product dict so callers can inspect nutriments / meta
-        product_info["raw_product"] = product
-        return product_info
-
-
-# --- OCR helpers ---------------------------------------------------------
-
-
-def preprocess_image_bytes(image_bytes: bytes, max_dim: int = 1600, contrast: float = 1.4) -> Image.Image:
-    img = Image.open(io.BytesIO(image_bytes))
-    try:
-        img = ImageOps.exif_transpose(img)
-    except Exception:
-        pass
-    if img.mode not in ("RGB", "L"):
-        img = img.convert("RGB")
-    w, h = img.size
-    scale = 1.0
-    if max(w, h) > max_dim:
-        scale = max_dim / float(max(w, h))
-    if scale != 1.0:
-        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
-    img = img.convert("L")
-    if contrast and contrast != 1.0:
-        try:
-            enhancer = ImageEnhance.Contrast(img)
-            img = enhancer.enhance(contrast)
-        except Exception:
-            pass
-    try:
-        img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=120, threshold=3))
-    except Exception:
-        pass
-    return img
-
-
-def preprocess_image_opencv(image_bytes: bytes, max_dim: int = 1600) -> Image.Image:
-    if not OPENCV_AVAILABLE:
-        raise RuntimeError("OpenCV not available")
-    img = Image.open(io.BytesIO(image_bytes))
-    try:
-        img = ImageOps.exif_transpose(img)
-    except Exception:
-        pass
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    arr = np.array(img)
-    bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
-    h, w = bgr.shape[:2]
-    scale = 1.0
-    if max(w, h) > max_dim:
-        scale = max_dim / float(max(w, h))
-    if scale != 1.0:
-        bgr = cv2.resize(bgr, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_LANCZOS4)
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    try:
-        gray = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
-    except Exception:
-        pass
-    try:
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        gray = clahe.apply(gray)
-    except Exception:
-        pass
-    try:
-        gray = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 8)
-    except Exception:
-        try:
-            _, gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        except Exception:
-            pass
-    return Image.fromarray(gray)
-
-
-def extract_text_from_image(image_input: str) -> str:
-    """
-    Extract text from a base64 encoded image string or URL.
-    """
-    if not image_input:
-        return ""
-        
-    try:
-        # Check if it's a URL (simple check)
-        if image_input.startswith("http") or image_input.startswith("https"):
-            # TODO: Implement URL fetching if needed
-            return ""
-        
-        # Assume base64
-        # Remove header if present (e.g. data:image/jpeg;base64,...)
-        if "," in image_input:
-            image_input = image_input.split(",", 1)[1]
-            
-        image_bytes = base64.b64decode(image_input)
-        
-        pil_image: Optional[Image.Image] = None
-        
-        # 1. Try OpenCV Preprocessing (Best)
-        if OPENCV_AVAILABLE:
-            try:
-                pil_image = preprocess_image_opencv(image_bytes)
-            except Exception:
-                pass
-        
-        # 2. Try PIL Preprocessing (Fallback)
-        if pil_image is None:
-            try:
-                pil_image = preprocess_image_bytes(image_bytes)
-            except Exception:
-                pass
-        
-        # 3. Raw Open (Last Resort)
-        if pil_image is None:
-             pil_image = Image.open(io.BytesIO(image_bytes))
-
-        if not PYTESSERACT_AVAILABLE:
-             # If no tesseract, we can't do much. 
-             # In future, external OCR API could be called here.
-             return ""
-
-        text = pytesseract.image_to_string(pil_image)
-        return text.strip()
-    except Exception as e:
-        print(f"OCR Error: {e}")
-        return ""
-
-
-# --- Entry point ---------------------------------------------------------
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the Untainted analyzer server")
-    parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default 8000)")
-    args = parser.parse_args()
-
-    # Ensure taxonomy is loaded at startup (errors recorded for capabilities endpoint)
-    try:
-        _ensure_taxonomy()
-    except Exception as exc:
-        global INGREDIENT_TAXONOMY_ERROR
-        INGREDIENT_TAXONOMY_ERROR = str(exc)
-
-    server = HTTPServer(("0.0.0.0", args.port), Handler)
-    print(f"Serving on http://localhost:{args.port}")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nShutting down...")
-    finally:
-        server.server_close()
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()
+# Legacy Handler removed

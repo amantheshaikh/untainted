@@ -8,7 +8,6 @@ const BuiltForPlatforms = dynamic(() => import("@/components/sections/BuiltForPl
 const BusinessBenefits = dynamic(() => import("@/components/sections/BusinessBenefits").then(mod => mod.BusinessBenefits))
 const BusinessUseCases = dynamic(() => import("@/components/sections/BusinessUseCases").then(mod => mod.BusinessUseCases))
 const IntelligenceEngine = dynamic(() => import("@/components/sections/IntelligenceEngine").then(mod => mod.IntelligenceEngine))
-const CaseStudiesCarousel = dynamic(() => import("@/components/sections/CaseStudiesCarousel").then(mod => mod.CaseStudiesCarousel))
 const DemoSection = dynamic(() => import("@/components/sections/DemoSection").then(mod => mod.DemoSection))
 const PricingSection = dynamic(() => import("@/components/sections/PricingSection").then(mod => mod.PricingSection))
 const FAQSection = dynamic(() => import("@/components/sections/FAQSection").then(mod => mod.FAQSection))

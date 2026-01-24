@@ -32,6 +32,29 @@ function SignInContent() {
     setStep(2)
   }
 
+  // Whitelist of safe redirect paths (must start with /)
+  const SAFE_REDIRECT_PATHS = ["/profile", "/checkout", "/settings", "/dashboard", "/"]
+
+  function getSafeRedirectPath(requestedPath: string | null): string {
+    if (!requestedPath) return "/profile"
+
+    // Only allow relative paths starting with /
+    if (!requestedPath.startsWith("/")) return "/profile"
+
+    // Block protocol-relative URLs (//example.com)
+    if (requestedPath.startsWith("//")) return "/profile"
+
+    // Extract just the pathname (remove query strings for comparison)
+    const pathname = requestedPath.split("?")[0]
+
+    // Check if the path starts with any safe prefix
+    const isSafe = SAFE_REDIRECT_PATHS.some(
+      (safePath) => pathname === safePath || pathname.startsWith(safePath + "/")
+    )
+
+    return isSafe ? requestedPath : "/profile"
+  }
+
   async function handleSignInPassword(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -42,8 +65,9 @@ function SignInContent() {
       setError(error.message)
       return
     }
-    // Respect an optional redirect (e.g. /signin?next=/checkout). Default to profile.
-    const redirectTo = searchParams?.get("next") || searchParams?.get("redirectTo") || "/profile"
+    // Respect an optional redirect, but validate it's a safe internal path
+    const requestedRedirect = searchParams?.get("next") || searchParams?.get("redirectTo")
+    const redirectTo = getSafeRedirectPath(requestedRedirect)
     router.push(redirectTo)
   }
 
