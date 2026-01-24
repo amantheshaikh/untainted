@@ -17,6 +17,14 @@ from collections import defaultdict, deque  # deque possibly unused now? check
 # process_ingredients logic? No.
 # I'll keep collections just in case for now, but remove the obvious ones.
 
+# Try to import openfoodfacts ProductDataset
+try:
+    from openfoodfacts import ProductDataset
+    OFF_DATASET_AVAILABLE = True
+except ImportError:
+    ProductDataset = None  # type: ignore
+    OFF_DATASET_AVAILABLE = False
+
 # Removed: argparse, base64, html, io, mimetypes, traceback, urllib.error, http.server, HTTPServer, PIL, cv2, pytesseract
 
 
