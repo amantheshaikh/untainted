@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
                 // The backend checks _authenticate_request.
                 // The frontend request to this route should have the token.
                 'Authorization': request.headers.get('Authorization') || '',
-                'X-API-Key': process.env.BACKEND_API_KEY || '', // Fallback or if needed
+                'X-API-Key': process.env.UNTAINTED_API_KEY || '', // Fallback or if needed
             },
             body: JSON.stringify(body),
         });
