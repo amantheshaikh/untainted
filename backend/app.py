@@ -946,8 +946,41 @@ async def analyze(payload: AnalyzePayload, request: Request) -> AnalyzeResponse:
         if payload.nutrition_info:
             if final_prefs:
                 health_list = final_prefs.get("health_restrictions") or final_prefs.get("health_conditions") or []
+                health_conditions_set = set()
                 if isinstance(health_list, (list, tuple)):
-                     health_conditions = [str(h).lower().replace(" ", "_") for h in health_list]
+                     for h in health_list:
+                         health_conditions_set.add(str(h).lower().replace(" ", "_").replace("-", "_"))
+
+                # Map Diets to Conditions for Nutrition Checks
+                diets = set()
+                raw_diet = final_prefs.get("diet") or final_prefs.get("dietaryPreference")
+                if raw_diet:
+                    diets.add(str(raw_diet).lower().strip())
+                
+                diet_list = final_prefs.get("dietary_preferences")
+                if isinstance(diet_list, (list, tuple)):
+                    for d in diet_list:
+                        diets.add(str(d).lower().strip())
+
+                diet_map = {
+                    "diabetic-friendly": "diabetic_friendly",
+                    "diabetic": "diabetes",
+                    "keto": "keto",
+                    "ketogenic": "keto",
+                    "low-sodium": "hypertension",
+                    "low sodium": "hypertension",
+                    "hypertension": "hypertension",
+                    "heart-healthy": "heart_healthy",
+                    "heart healthy": "heart_healthy",
+                    "low-fat": "heart_healthy",
+                    "low fat": "heart_healthy",
+                }
+
+                for d in diets:
+                    if d in diet_map:
+                        health_conditions_set.add(diet_map[d])
+                
+                health_conditions = list(health_conditions_set)
 
             # Combine both original ingredient names AND normalized display names for regulatory check
             # This ensures we catch prohibited ingredients even if they get normalized to E-numbers

@@ -7,15 +7,17 @@ allergies, health goals, and custom avoidance ingredients.
 
 import os
 import json
-import google.generativeai as genai
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
+
+from google import genai
 
 # Configure API key
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
+client = None
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
 GEMINI_MODEL = "gemini-3-flash-preview"  # Use a fast model for interactive requests
 
@@ -43,7 +45,7 @@ def analyze_profile_bio(text: str) -> ProfileAnalysisResult:
     """
     Analyzes a user's bio text to extract dietary profile.
     """
-    if not GEMINI_API_KEY:
+    if not client:
         raise ValueError("GEMINI_API_KEY not configured")
 
     if not text or not text.strip():
@@ -119,8 +121,10 @@ def analyze_profile_bio(text: str) -> ProfileAnalysisResult:
 
     for model_name in models_to_try:
         try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
             cleaned_json = _clean_json_response(response.text)
             data = json.loads(cleaned_json)
 

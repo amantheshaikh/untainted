@@ -3,7 +3,7 @@ from __future__ import annotations
 import difflib
 import os
 import re
-import requests
+
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -91,29 +91,6 @@ CLEAN_EATING_WATCHLIST = {
     "lecithin",
 }
 
-DEFAULT_FLAG_IDS = {
-    "en:sugar",
-    "en:sugar-various-sugars",
-    "en:high-fructose-corn-syrup",
-    "en:palm-oil",
-    "en:palm-oil-and-fat",
-    "en:monosodium-glutamate",
-    "en:e621",
-    "en:sodium-benzoate",
-    "en:tartrazine",
-    "en:sodium-nitrate",
-    "en:sodium-nitrite",
-    "en:potassium-bromate",
-    "en:propyl-gallate",
-    "en:calcium-propionate",
-    "en:corn-syrup-solids",
-    "en:neotame",
-    "en:carrageenan",
-    "en:polysorbate-80",
-    "en:propylene-glycol",
-    "en:mono-and-diglycerides-of-fatty-acids",
-    "en:lecithins",
-}
 
 # Flags for strict Clean Eating mode only
 CLEAN_EATING_FLAG_IDS = {
@@ -255,9 +232,8 @@ CORS_ALLOW_HEADERS = os.environ.get(
 CORS_ALLOW_METHODS = os.environ.get("CORS_ALLOW_METHODS", "GET, POST, OPTIONS").strip()
 CORS_ALLOWED_ORIGINS_LOOKUP = {origin.lower(): origin for origin in CORS_ALLOWED_ORIGINS if origin != "*"}
 
-ACTIVE_LANGS: Set[str] = {"en"}
-if OFF_DEFAULT_LANGUAGE:
-    ACTIVE_LANGS.add(OFF_DEFAULT_LANGUAGE.lower())
+# Optimization: Hardcode active languages to English only
+ACTIVE_LANGS = ["en"]
 
 OFF_TAXONOMY_PATH = os.environ.get("OFF_TAXONOMY_PATH")
 OFF_ADDITIVES_PATH = os.environ.get("OFF_ADDITIVES_PATH")
@@ -267,12 +243,6 @@ OFF_DATASET_FIELDS = [f.strip() for f in os.environ.get(
 ).split(",") if f.strip()]
 OFF_DATASET_MAX_SCAN = int(os.environ.get("OFF_DATASET_MAX_SCAN", "200000"))
 
-# Nutriment thresholds (grams per 100g) used to augment diet rules when
-# OpenFoodFacts `nutriments` data is available on a product.
-# - DIABETIC_SUGARS_PER_100G_THRESHOLD: above this, mark as high-sugar
-# - KETO_NET_CARBS_PER_100G_THRESHOLD: above this, mark as too many net carbs
-DIABETIC_SUGARS_PER_100G_THRESHOLD = float(os.environ.get("DIABETIC_SUGARS_PER_100G_THRESHOLD", "5.0"))
-KETO_NET_CARBS_PER_100G_THRESHOLD = float(os.environ.get("KETO_NET_CARBS_PER_100G_THRESHOLD", "5.0"))
 
 # Try a couple of default locations for ingredients.txt when env var is not set
 if not OFF_TAXONOMY_PATH:
@@ -478,6 +448,7 @@ class IngredientTaxonomy:
         self.mapping: Dict[str, str] = {}
         self.stopwords: Dict[str, Set[str]] = {}
         self._plain_tokens: Set[str] = set()
+        self._cached_pool: List[str] = []
         if path:
             self.load(path)
 
@@ -515,6 +486,9 @@ class IngredientTaxonomy:
         # resolve parent references
         for node in nodes.values():
             node.parents = [nodes[parent_id] for parent_id in node.parent_ids if parent_id in nodes]
+
+        # Update cache
+        self._cached_pool = list(self._plain_tokens)
 
     def _register_mapping(self, key: str, node_id: str, prefer: bool = False) -> None:
         if not key:
@@ -616,6 +590,13 @@ class IngredientTaxonomy:
                     finalize_block()
                     continue
 
+                # English-Only Optimization:
+                # Quickly check if line starts with a 2-letter lang code that is NOT 'en'
+                # Format: "xy: value" or "xy:value"
+                if len(line) > 3 and line[2] == ':' and line[0:2].islower():
+                   if not line.startswith("en:"):
+                       continue
+
                 if line.startswith("#"):
                     header_match = ingredient_header.match(line)
                     if header_match:
@@ -713,7 +694,9 @@ class IngredientTaxonomy:
         if not token or not self._plain_tokens:
             return None
 
-        search_pool = list(self._plain_tokens)
+        if not self._cached_pool and self._plain_tokens:
+             self._cached_pool = list(self._plain_tokens)
+        search_pool = self._cached_pool
         normalized = token
 
         def best_match(cutoff: float) -> Optional[str]:
@@ -1232,6 +1215,7 @@ def off_dataset_lookup(barcode: str) -> Optional[Dict[str, Any]]:
     
     # 2. API Lookup (Fallback)
     try:
+        import requests
         url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
         print(f"[DEBUG] Lookup OFF API: {url}")
         headers = {
@@ -1325,7 +1309,6 @@ NORMALIZER = _ensure_normalizer()
 
 CLEAN_EATING_NORMALIZED = {normalize_token(token) for token in CLEAN_EATING_WATCHLIST}
 CLEAN_EATING_CANONICALS = {normalize_token(flag.split(":", 1)[-1]) for flag in CLEAN_EATING_FLAG_IDS}
-FLAG_CANONICALS = {normalize_token(flag.split(":", 1)[-1]) for flag in DEFAULT_FLAG_IDS}
 
 
 def _diet_tokens(ids: Iterable[str]) -> Set[str]:
@@ -2192,126 +2175,8 @@ def evaluate_items(
                         allergy_hits.append(f"{normalized_display} (Allergen)")
 
     # Nutriment-based checks (Diabetes / Keto / FSSAI Insights)
-    if nutriments:
-        def _get_nutriment(keys: List[str]) -> Optional[float]:
-            for k in keys:
-                if k in nutriments:
-                    try:
-                        val = nutriments[k]
-                        # Handle string values like "5g" or "5 g"
-                        if isinstance(val, str):
-                            val = ''.join(c for c in val if c.isdigit() or c == '.')
-                        return float(val) if val else None
-                    except:
-                        pass
-            return None
-
-        sugars = _get_nutriment(["sugars_100g", "sugars", "sugar_100g", "sugars_value", "sugar", "total_sugars"])
-        carbs = _get_nutriment(["carbohydrates_100g", "carbohydrates", "carbohydrate_100g", "carbs_100g", "carbs", "total_carbohydrates"])
-        fiber = _get_nutriment(["fiber_100g", "fiber", "dietary_fiber", "fibre"])
-        sodium = _get_nutriment(["sodium_100g", "sodium", "sodium_mg", "salt"])
-        saturated_fat = _get_nutriment(["saturated_fat_100g", "saturated_fat", "saturated_fat_g"])
-        trans_fat = _get_nutriment(["trans_fat_100g", "trans_fat", "trans_fat_g"])
-        _get_nutriment(["energy_100g", "energy", "calories", "energy_kcal", "kcal"])
-        protein = _get_nutriment(["protein_100g", "protein", "proteins"])
-
-        net_carbs = None
-        if carbs is not None:
-             net_carbs = carbs - (fiber or 0.0)
-
-        for diet_name in diet_preferences:
-            # diabetic-friendly: flag high sugar content
-            if diet_name == "diabetic-friendly" and sugars is not None:
-                if sugars >= DIABETIC_SUGARS_PER_100G_THRESHOLD:
-                    label = f"High Sugar ({sugars}g/100g)"
-                    if label.lower() not in seen_diet:
-                        seen_diet.add(label.lower())
-                        diet_hits.append(label)
-
-            # keto: flag high net carbs
-            if diet_name == "keto" and net_carbs is not None:
-                if net_carbs >= KETO_NET_CARBS_PER_100G_THRESHOLD:
-                    label = f"High Net Carbs ({net_carbs:.1f}g/100g)"
-                    if label.lower() not in seen_diet:
-                        seen_diet.add(label.lower())
-                        diet_hits.append(label)
-
-            # low-sodium: flag high sodium
-            if diet_name in ("low-sodium", "hypertension", "heart-healthy") and sodium is not None:
-                if sodium > 400:  # FSSAI threshold for "high sodium"
-                    label = f"High Sodium ({sodium:.0f}mg/100g)"
-                    if label.lower() not in seen_diet:
-                        seen_diet.add(label.lower())
-                        diet_hits.append(label)
-
-            # low-fat diets: flag high saturated fat
-            if diet_name in ("low-fat", "heart-healthy") and saturated_fat is not None:
-                if saturated_fat > 1.5:  # FSSAI threshold
-                    label = f"High Saturated Fat ({saturated_fat}g/100g)"
-                    if label.lower() not in seen_diet:
-                        seen_diet.add(label.lower())
-                        diet_hits.append(label)
-
-        # FSSAI-based health insights for all users (not just specific diets)
-        # These are informational, not blocking
-
-        # High sugar warning (WHO recommends max 25g/day)
-        if sugars is not None and sugars > 10:
-            insight = f"High sugar: {sugars}g per 100g ({sugars/25*100:.0f}% of daily limit per 100g)"
-            if insight.lower() not in seen_insights:
-                seen_insights.add(insight.lower())
-                health_insights.append(insight)
-
-        # High sodium warning
-        if sodium is not None and sodium > 400:
-            insight = f"High sodium: {sodium:.0f}mg per 100g ({sodium/2000*100:.0f}% of daily limit)"
-            if insight.lower() not in seen_insights:
-                seen_insights.add(insight.lower())
-                health_insights.append(insight)
-
-        # Trans fat warning (should be as close to 0 as possible)
-        if trans_fat is not None and trans_fat > 0.2:
-            insight = f"Contains trans fat: {trans_fat}g per 100g (FSSAI recommends avoiding)"
-            if insight.lower() not in seen_insights:
-                seen_insights.add(insight.lower())
-                health_insights.append(insight)
-
-        # Positive insights
-        if fiber is not None and fiber >= 6.0:
-            insight = f"High fiber: {fiber}g per 100g (good for digestion)"
-            if insight.lower() not in seen_insights:
-                seen_insights.add(insight.lower())
-                health_insights.append(insight)
-
-        if protein is not None and protein >= 10.0:
-            insight = f"Good protein source: {protein}g per 100g"
-            if insight.lower() not in seen_insights:
-                seen_insights.add(insight.lower())
-                health_insights.append(insight)
-
-        # Health condition specific insights
-        if health_conditions:
-            for condition in health_conditions:
-                if condition in ("diabetes", "diabetic") and sugars is not None:
-                    if sugars > 5:
-                        insight = f"Diabetes caution: {sugars}g sugar exceeds 5g/100g threshold"
-                        if insight.lower() not in seen_insights:
-                            seen_insights.add(insight.lower())
-                            health_insights.append(insight)
-
-                if condition in ("hypertension", "high_blood_pressure") and sodium is not None:
-                    if sodium > 200:
-                        insight = f"Hypertension caution: {sodium:.0f}mg sodium is high for blood pressure management"
-                        if insight.lower() not in seen_insights:
-                            seen_insights.add(insight.lower())
-                            health_insights.append(insight)
-
-                if condition in ("heart_disease", "cardiovascular") and saturated_fat is not None:
-                    if saturated_fat > 1.5:
-                        insight = f"Heart health caution: {saturated_fat}g saturated fat per 100g"
-                        if insight.lower() not in seen_insights:
-                            seen_insights.add(insight.lower())
-                            health_insights.append(insight)
+    # OPTIMIZATION: Logic moved to fssai.generate_nutrition_insights called in app.py
+    # This prevents double processing and centralizes nutrition rules.
 
     # NOVA Group Checks (Ultra-processed foods)
     nova_group = None

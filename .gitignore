@@ -10,3 +10,7 @@ node_modules/
 
 # Backend secrets
 backend/.env
+
+# Python venv
+.venv/
+.venv

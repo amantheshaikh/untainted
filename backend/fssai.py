@@ -404,6 +404,10 @@ HEALTH_CONDITION_THRESHOLDS: Dict[str, Dict[str, NutrientLimit]] = {
         # The current NutrientLimit class only has max/daily. 
         # Let's Skip High Protein for now in thresholds, rely on general "Good Protein" insight.
     },
+    "keto": {
+        "net_carbs": NutrientLimit(max_per_100g=5.0, daily_limit=20.0, unit="g"),
+        "sugar": NutrientLimit(max_per_100g=2.0, daily_limit=20.0, unit="g"),
+    },
 }
 
 # =============================================================================
@@ -661,6 +665,13 @@ def generate_nutrition_insights(
             "severity": "high"
         })
 
+    # Calculate net carbs for Keto checks
+    net_carbs = None
+    carbs = get_nutrient(["carbohydrates", "carbohydrates_100g", "carbs", "total_carbohydrates"])
+    fiber = get_nutrient(["fiber", "fiber_100g", "dietary_fiber"])
+    if carbs is not None:
+        net_carbs = carbs - (fiber or 0.0)
+
     # Condition-specific insights
     if health_conditions:
         for condition in health_conditions:
@@ -671,7 +682,19 @@ def generate_nutrition_insights(
                 continue
 
             for nutrient_name, limit in thresholds.items():
-                value = get_nutrient([nutrient_name, f"{nutrient_name}_100g", f"{nutrient_name}_g", f"{nutrient_name}_mg"])
+                if nutrient_name == "net_carbs":
+                    value = net_carbs
+                else:
+                    # Expand common synonyms
+                    search_keys = [nutrient_name, f"{nutrient_name}_100g", f"{nutrient_name}_g", f"{nutrient_name}_mg"]
+                    if nutrient_name == "sugar":
+                        search_keys.extend(["sugars", "sugars_100g", "total_sugars"])
+                    elif nutrient_name == "carbohydrates":
+                        search_keys.extend(["carbs", "carbs_100g", "total_carbohydrates", "carbohydrate_100g"])
+                    elif nutrient_name == "fiber":
+                        search_keys.extend(["dietary_fiber", "fibre"])
+
+                    value = get_nutrient(search_keys)
 
                 if value is None:
                     continue

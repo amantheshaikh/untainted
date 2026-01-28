@@ -1,5 +1,5 @@
 # Untainted Project Context Bundle
-Generated on Wed Jan 28 10:56:01 IST 2026
+Generated on Wed Jan 28 12:16:24 IST 2026
 ----------------------------------------
 
 ## 1. Project Context Summary
@@ -191,6 +191,7 @@ Platform-level access keys (B2B).
 ./backend/tests/list_models.py
 ./backend/tests/test_profile_ai_manual.py
 ./backend/tests/test_api.py
+./backend/tests/debug_maggi.py
 ./backend/__init__.py
 ./backend/README.md
 ./backend/vlm.py

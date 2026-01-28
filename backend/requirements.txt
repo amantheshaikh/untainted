@@ -9,7 +9,8 @@ requests
 openfoodfacts
 python-multipart
 supabase
-google-generativeai
+google-genai
+
 
 # Testing
 pytest>=7.0.0

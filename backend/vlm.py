@@ -12,33 +12,38 @@ import json
 import re
 from typing import Dict, Any, Optional, List
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # Configure API key
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
+client = None
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Models to use for extraction
 GEMINI_MODEL_PRIMARY = "gemini-3-flash-preview"
 GEMINI_MODEL_BACKUP = "gemini-2.5-flash"
 
 
-def _generate_content_with_fallback(content: Any, generation_config: Any = None, request_options: Dict[str, Any] = None) -> Any:
+def _generate_content_with_fallback(contents: Any, config: Any = None) -> Any:
     """
     Generate content using primary model, falling back to backup on failure.
     """
+    if not client:
+        raise ValueError("GEMINI_API_KEY not configured")
+
     models = [GEMINI_MODEL_PRIMARY, GEMINI_MODEL_BACKUP]
     last_error = None
 
     for model_name in models:
          try:
-             model = genai.GenerativeModel(
-                 model_name,
-                 generation_config=generation_config
+             return client.models.generate_content(
+                 model=model_name,
+                 contents=contents,
+                 config=config
              )
-             return model.generate_content(content, request_options=request_options)
          except Exception as e:
              print(f"Gemini error with {model_name}: {e}")
              last_error = e
@@ -196,10 +201,10 @@ def extract_ingredients_fast(image_parts: List[Dict[str, Any]]) -> str:
     Optimized ingredient extraction - shorter prompt, faster response.
     Uses generation config to limit output tokens.
     """
-    if not GEMINI_API_KEY:
+    if not client:
         raise ValueError("GEMINI_API_KEY not configured")
 
-    generation_config = genai.GenerationConfig(
+    config = types.GenerateContentConfig(
             max_output_tokens=32768,  # Ingredients rarely exceed this
             temperature=0.1,  # Low temperature for accurate transcription
     )
@@ -210,10 +215,29 @@ Return ONLY the ingredients text, comma-separated. No "Ingredients:" prefix.
 Include allergen warnings if present (e.g., "Contains: milk").
 If no ingredients found, return empty string."""
 
-    content = [prompt] + list(image_parts)
+    # Convert image_parts to format expected by google-genai if needed
+    # Usually it accepts Pillow Image, or bytes, or blob.
+    # Assuming image_parts are compatible or we just pass them in "contents" list.
+    # Check if image_parts are dicts representing blobs (from older SDK usage maybe?)
+    # Old SDK accepted: {'mime_type': 'image/jpeg', 'data': b'...'}
+    # New SDK accepts: types.Part.from_bytes(data, mime_type) if using helper,
+    # or just raw bytes/images if handled.
+    # Let's assume the caller passes compatible parts or we need to adapt.
+    # Looking at `extract_ingredients_fast` caller usually constructs these.
+    # If they are dicts `{'mime_type': ..., 'data': ...}`, we might need to convert.
+    # However, `google.genai` handles dicts that look like Parts? Maybe not.
+    # Better to convert to types.Part if they are dicts.
+    
+    # Adapting to types.Part if input is dict
+    contents = [prompt]
+    for part in image_parts:
+        if isinstance(part, dict) and 'mime_type' in part and 'data' in part:
+            contents.append(types.Part.from_bytes(data=part['data'], mime_type=part['mime_type']))
+        else:
+            contents.append(part)
 
     try:
-        response = _generate_content_with_fallback(content, generation_config=generation_config, request_options={'timeout': 20})
+        response = _generate_content_with_fallback(contents, config=config)
         try:
             return response.text.strip()
         except ValueError:
@@ -230,7 +254,7 @@ def extract_ingredients_with_gemini(image_parts: List[Dict[str, Any]]) -> str:
     Uses Gemini to extract ingredients text from images.
     Returns the raw ingredient text.
     """
-    if not GEMINI_API_KEY:
+    if not client:
         raise ValueError("GEMINI_API_KEY not configured")
 
     prompt = """
@@ -255,19 +279,23 @@ def extract_ingredients_with_gemini(image_parts: List[Dict[str, Any]]) -> str:
     Water, Sugar, Cocoa Powder (10%), Milk Solids, Emulsifier (Soy Lecithin), Natural Flavors. Contains: Milk, Soy.
     """
 
-    content = [prompt]
-    for img in image_parts:
-        content.append(img)
+    contents = [prompt]
+    for part in image_parts:
+        if isinstance(part, dict) and 'mime_type' in part and 'data' in part:
+            contents.append(types.Part.from_bytes(data=part['data'], mime_type=part['mime_type']))
+        else:
+            contents.append(part)
 
     try:
-        response = _generate_content_with_fallback(content, request_options={'timeout': 30})
+        response = _generate_content_with_fallback(contents)
         try:
             return response.text.strip()
         except ValueError:
             # Handle cases where response.text is not available (e.g. safety filters)
             if response.candidates:
                 print(f"Gemini output blocked. Finish reason: {response.candidates[0].finish_reason}")
-                print(f"Safety ratings: {response.candidates[0].safety_ratings}")
+                if response.candidates[0].safety_ratings:
+                    print(f"Safety ratings: {response.candidates[0].safety_ratings}")
             return ""
     except Exception as e:
         print(f"VLM Error: {e}")
@@ -279,7 +307,7 @@ def extract_nutrition_with_gemini(image_parts: List[Dict[str, Any]]) -> Dict[str
     Uses Gemini to extract structured nutrition info from images.
     Returns normalized nutrition data per 100g where possible.
     """
-    if not GEMINI_API_KEY:
+    if not client:
         raise ValueError("GEMINI_API_KEY not configured")
 
     prompt = """
@@ -316,11 +344,14 @@ def extract_nutrition_with_gemini(image_parts: List[Dict[str, Any]]) -> Dict[str
     """
 
     try:
-        content = [prompt]
-        for img in image_parts:
-            content.append(img)
+        contents = [prompt]
+        for part in image_parts:
+            if isinstance(part, dict) and 'mime_type' in part and 'data' in part:
+                contents.append(types.Part.from_bytes(data=part['data'], mime_type=part['mime_type']))
+            else:
+                contents.append(part)
 
-        response = _generate_content_with_fallback(content, request_options={'timeout': 30})
+        response = _generate_content_with_fallback(contents)
         try:
             text_content = response.text
         except ValueError:
@@ -362,7 +393,7 @@ def extract_label_with_gemini(image_parts: List[Dict[str, Any]]) -> Dict[str, An
             "confidence": 0.95
         }
     """
-    if not GEMINI_API_KEY:
+    if not client:
         raise ValueError("GEMINI_API_KEY not configured")
 
     prompt = """
@@ -404,11 +435,14 @@ def extract_label_with_gemini(image_parts: List[Dict[str, Any]]) -> Dict[str, An
     """
 
     try:
-        content = [prompt]
-        for img in image_parts:
-            content.append(img)
+        contents = [prompt]
+        for part in image_parts:
+            if isinstance(part, dict) and 'mime_type' in part and 'data' in part:
+                contents.append(types.Part.from_bytes(data=part['data'], mime_type=part['mime_type']))
+            else:
+                contents.append(part)
 
-        response = _generate_content_with_fallback(content, request_options={'timeout': 30})
+        response = _generate_content_with_fallback(contents)
         try:
             text_content = response.text
         except ValueError:
