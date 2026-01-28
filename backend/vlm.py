@@ -20,9 +20,33 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# Model to use for extraction
-# Model to use for extraction
-GEMINI_MODEL = "gemini-3-flash-preview"
+# Models to use for extraction
+GEMINI_MODEL_PRIMARY = "gemini-3-flash-preview"
+GEMINI_MODEL_BACKUP = "gemini-2.5-flash"
+
+
+def _generate_content_with_fallback(content: Any, generation_config: Any = None, request_options: Dict[str, Any] = None) -> Any:
+    """
+    Generate content using primary model, falling back to backup on failure.
+    """
+    models = [GEMINI_MODEL_PRIMARY, GEMINI_MODEL_BACKUP]
+    last_error = None
+
+    for model_name in models:
+         try:
+             model = genai.GenerativeModel(
+                 model_name,
+                 generation_config=generation_config
+             )
+             return model.generate_content(content, request_options=request_options)
+         except Exception as e:
+             print(f"Gemini error with {model_name}: {e}")
+             last_error = e
+             continue
+    
+    if last_error:
+        raise last_error
+    raise ValueError("All models failed")
 
 
 def _clean_json_response(text: str) -> str:
@@ -175,12 +199,9 @@ def extract_ingredients_fast(image_parts: List[Dict[str, Any]]) -> str:
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY not configured")
 
-    model = genai.GenerativeModel(
-        GEMINI_MODEL,
-        generation_config=genai.GenerationConfig(
+    generation_config = genai.GenerationConfig(
             max_output_tokens=32768,  # Ingredients rarely exceed this
             temperature=0.1,  # Low temperature for accurate transcription
-        )
     )
 
     # Shorter, focused prompt
@@ -192,7 +213,7 @@ If no ingredients found, return empty string."""
     content = [prompt] + list(image_parts)
 
     try:
-        response = model.generate_content(content, request_options={'timeout': 20})
+        response = _generate_content_with_fallback(content, generation_config=generation_config, request_options={'timeout': 20})
         try:
             return response.text.strip()
         except ValueError:
@@ -211,8 +232,6 @@ def extract_ingredients_with_gemini(image_parts: List[Dict[str, Any]]) -> str:
     """
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY not configured")
-
-    model = genai.GenerativeModel(GEMINI_MODEL)
 
     prompt = """
     Analyze these product images carefully. Your task is to find and transcribe the INGREDIENTS list.
@@ -241,7 +260,7 @@ def extract_ingredients_with_gemini(image_parts: List[Dict[str, Any]]) -> str:
         content.append(img)
 
     try:
-        response = model.generate_content(content, request_options={'timeout': 30})
+        response = _generate_content_with_fallback(content, request_options={'timeout': 30})
         try:
             return response.text.strip()
         except ValueError:
@@ -262,8 +281,6 @@ def extract_nutrition_with_gemini(image_parts: List[Dict[str, Any]]) -> Dict[str
     """
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY not configured")
-
-    model = genai.GenerativeModel(GEMINI_MODEL)
 
     prompt = """
     Analyze these product images to extract the NUTRITION FACTS / NUTRITION INFORMATION table.
@@ -303,7 +320,7 @@ def extract_nutrition_with_gemini(image_parts: List[Dict[str, Any]]) -> Dict[str
         for img in image_parts:
             content.append(img)
 
-        response = model.generate_content(content, request_options={'timeout': 30})
+        response = _generate_content_with_fallback(content, request_options={'timeout': 30})
         try:
             text_content = response.text
         except ValueError:
@@ -348,8 +365,6 @@ def extract_label_with_gemini(image_parts: List[Dict[str, Any]]) -> Dict[str, An
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY not configured")
 
-    model = genai.GenerativeModel(GEMINI_MODEL)
-
     prompt = """
     Analyze these product label images and extract ALL information.
 
@@ -393,7 +408,7 @@ def extract_label_with_gemini(image_parts: List[Dict[str, Any]]) -> Dict[str, An
         for img in image_parts:
             content.append(img)
 
-        response = model.generate_content(content, request_options={'timeout': 30})
+        response = _generate_content_with_fallback(content, request_options={'timeout': 30})
         try:
             text_content = response.text
         except ValueError:

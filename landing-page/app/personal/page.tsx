@@ -3,7 +3,7 @@
 import { Navbar } from "@/components/layout/Navbar"
 import { Footer } from "@/components/layout/Footer"
 import { ForYouSection } from "@/components/sections/ForYouSection"
-import { DemoSection } from "@/components/sections/DemoSection"
+import { EndingCTASection } from "@/components/sections/EndingCTASection"
 import { FAQSection } from "@/components/sections/FAQSection"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -18,86 +18,86 @@ export default function PersonalPage() {
 
   const handleJoinWaitlist = async () => {
     if (!email || !email.includes("@")) return
-    
+
     setStatus('loading')
-    
+
     // Check if email already exists to prevent duplicate errors if table has unique constraint
     // Or just let insert fail/succeed. Let's try insert.
     const { error } = await supabase.from("waitlist").insert([{ email, source: 'personal_page' }])
-    
+
     if (error) {
-        // If error code is unique violation (23505), treat as success (user already registered)
-        if (error.code === '23505') {
-            setStatus('success')
-        } else {
-            console.error(error)
-            setStatus('error')
-        }
-    } else {
+      // If error code is unique violation (23505), treat as success (user already registered)
+      if (error.code === '23505') {
         setStatus('success')
-        setEmail("")
+      } else {
+        console.error(error)
+        setStatus('error')
+      }
+    } else {
+      setStatus('success')
+      setEmail("")
     }
   }
 
   return (
     <main className="min-h-screen bg-background pt-20">
       <Navbar />
-      
+
       {/* Hero Section */}
       <section className="relative px-6 lg:px-8 py-10 lg:py-10">
         <div className="max-w-7xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="text-center mb-16"
-            >
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20 mb-8">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
-                  </span>
-                  <span className="text-sm font-medium text-accent">App Coming Soon</span>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-16"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20 mb-8">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+              </span>
+              <span className="text-sm font-medium text-accent">App Coming Soon</span>
+            </div>
+
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-foreground leading-tight mb-6 text-balance">
+              The Untainted App
+            </h1>
+
+            <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-10">
+              Create your food profile once, use it everywhere. Shop confidently across any app, website, or store
+              with your personalized food intelligence companion.
+            </p>
+
+            {/* Waitlist Input */}
+            <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto mb-12">
+              {status === 'success' ? (
+                <div className="flex-1 bg-primary/10 text-primary border border-primary/20 px-5 py-3 rounded-full text-center font-medium animate-in fade-in zoom-in duration-300">
+                  🎉 You're on the list! We'll be in touch.
                 </div>
-
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-foreground leading-tight mb-6 text-balance">
-                  The Untainted App
-                </h1>
-
-                <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-10">
-                  Your personal food intelligence companion. Create your profile, scan products, and make safer food
-                  choices—whether you're shopping online or in-store.
-                </p>
-
-                {/* Waitlist Input */}
-                <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto mb-12">
-                   {status === 'success' ? (
-                       <div className="flex-1 bg-primary/10 text-primary border border-primary/20 px-5 py-3 rounded-full text-center font-medium animate-in fade-in zoom-in duration-300">
-                           🎉 You're on the list! We'll be in touch.
-                       </div>
-                   ) : (
-                       <>
-                           <input
-                             type="email"
-                             value={email}
-                             onChange={(e) => setEmail(e.target.value)}
-                             placeholder="Enter your email for early access"
-                             className="flex-1 px-5 py-3 rounded-full border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                             disabled={status === 'loading'}
-                             onKeyDown={(e) => e.key === 'Enter' && handleJoinWaitlist()}
-                           />
-                           <button 
-                             onClick={handleJoinWaitlist}
-                             disabled={status === 'loading' || !email}
-                             className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                           >
-                             {status === 'loading' ? 'Joining...' : 'Join Waitlist'}
-                           </button>
-                       </>
-                   )}
-                </div>
-                 <p className="text-xs text-muted-foreground">We'll notify you when iOS & Android apps launch.</p>
-            </motion.div>
+              ) : (
+                <>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email for early access"
+                    className="flex-1 px-5 py-3 rounded-full border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    disabled={status === 'loading'}
+                    onKeyDown={(e) => e.key === 'Enter' && handleJoinWaitlist()}
+                  />
+                  <button
+                    onClick={handleJoinWaitlist}
+                    disabled={status === 'loading' || !email}
+                    className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-semibold hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {status === 'loading' ? 'Joining...' : 'Join Waitlist'}
+                  </button>
+                </>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">We'll notify you when iOS & Android apps launch.</p>
+          </motion.div>
 
           {/* Phone Mockups */}
           <div className="grid lg:grid-cols-3 gap-8 lg:gap-12 items-start">
@@ -371,9 +371,9 @@ export default function PersonalPage() {
               <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-4 text-orange-600">
                 <User className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Personal Food Profile</h3>
+              <h3 className="text-lg font-semibold mb-2">One Profile, Everywhere</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Set your dietary preferences, allergies, and restrictions. Your profile syncs across all connected platforms.
+                Define your dietary needs once. We apply them automatically to every grocery app, website, and physical store you visit.
               </p>
             </div>
 
@@ -413,90 +413,90 @@ export default function PersonalPage() {
         </div>
       </section>
 
-      <DemoSection />
-      
+      <EndingCTASection />
+
       {/* Feature Spotlight: Natural Language Intelligence */}
       <section className="py-24 bg-primary/5 border-y border-primary/10">
         <div className="container mx-auto px-6">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-                <div>
-                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
-                      <Sparkles className="w-4 h-4" />
-                      Nutrition Intelligence
-                   </div>
-                   <h2 className="text-3xl lg:text-4xl font-bold mb-6 text-balance">
-                      Just say: <br/>
-                      <span className="text-primary">"I'm vegan and allergic to peanuts."</span>
-                   </h2>
-                   <p className="text-lg text-muted-foreground leading-relaxed mb-8">
-                      No more endless checkboxes. Our AI understands your health profile in plain English. 
-                      Whether you have complex medical conditions or simple lifestyle choices, just type it out.
-                   </p>
-                   <div className="flex flex-col gap-4">
-                      <div className="flex items-start gap-4 p-4 bg-background rounded-xl border border-border shadow-sm">
-                          <div className="bg-chart-3/10 p-2 rounded-lg text-chart-3 mt-1">
-                              <CheckCircle2 className="w-5 h-5" />
-                          </div>
-                          <div>
-                              <div className="font-semibold text-foreground">Smart Parsing</div>
-                              <div className="text-sm text-muted-foreground">Instantly maps "high blood pressure" to "Low Sodium" logic.</div>
-                          </div>
-                      </div>
-                      <div className="flex items-start gap-4 p-4 bg-background rounded-xl border border-border shadow-sm">
-                          <div className="bg-accent/10 p-2 rounded-lg text-accent mt-1">
-                              <Shield className="w-5 h-5" />
-                          </div>
-                          <div>
-                              <div className="font-semibold text-foreground">Conflict Resolution</div>
-                              <div className="text-sm text-muted-foreground">Automatically handles overlapping diet rules (e.g. Jain vs Vegan).</div>
-                          </div>
-                      </div>
-                   </div>
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+                <Sparkles className="w-4 h-4" />
+                Nutrition Intelligence
+              </div>
+              <h2 className="text-3xl lg:text-4xl font-bold mb-6 text-balance">
+                Just say: <br />
+                <span className="text-primary">"I'm vegan and allergic to peanuts."</span>
+              </h2>
+              <p className="text-lg text-muted-foreground leading-relaxed mb-8">
+                No more endless checkboxes. Our AI understands your health profile in plain English.
+                Whether you have complex medical conditions or simple lifestyle choices, just type it out.
+              </p>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-start gap-4 p-4 bg-background rounded-xl border border-border shadow-sm">
+                  <div className="bg-chart-3/10 p-2 rounded-lg text-chart-3 mt-1">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-foreground">Smart Parsing</div>
+                    <div className="text-sm text-muted-foreground">Instantly maps "high blood pressure" to "Low Sodium" logic.</div>
+                  </div>
                 </div>
-                
-                {/* Visual Demo */}
-                <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-accent/20 rounded-3xl blur-3xl transform rotate-3 scale-95" />
-                    <div className="relative bg-card border border-border rounded-2xl shadow-2xl p-6 lg:p-10 space-y-6">
-                        {/* Input State */}
-                        <div className="space-y-2">
-                            <div className="text-xs font-medium text-muted-foreground uppercase">You Type</div>
-                            <div className="p-4 rounded-xl bg-background border border-primary/30 text-foreground font-medium shadow-sm">
-                                "I follow a <span className="text-primary bg-primary/10 px-1 rounded">Keto</span> diet but I absolutely cannot have <span className="text-destructive bg-destructive/10 px-1 rounded">Dairy</span> or <span className="text-destructive bg-destructive/10 px-1 rounded">Soy</span>."
-                            </div>
-                        </div>
-
-                        {/* Arrow */}
-                        <div className="flex justify-center text-muted-foreground">
-                            <ArrowDown className="w-6 h-6 animate-bounce" />
-                        </div>
-
-                        {/* Result State */}
-                        <div className="space-y-2">
-                             <div className="text-xs font-medium text-muted-foreground uppercase">We Build</div>
-                             <div className="grid gap-3">
-                                <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
-                                    <span className="text-sm font-medium">Dietary Type</span>
-                                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full border border-primary/20">Keto</span>
-                                </div>
-                                <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
-                                    <span className="text-sm font-medium">Allergens</span>
-                                    <div className="flex gap-2">
-                                        <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full border border-destructive/20">Dairy</span>
-                                        <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full border border-destructive/20">Soy</span>
-                                    </div>
-                                </div>
-                             </div>
-                        </div>
-                    </div>
+                <div className="flex items-start gap-4 p-4 bg-background rounded-xl border border-border shadow-sm">
+                  <div className="bg-accent/10 p-2 rounded-lg text-accent mt-1">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-foreground">Conflict Resolution</div>
+                    <div className="text-sm text-muted-foreground">Automatically handles overlapping diet rules (e.g. Jain vs Vegan).</div>
+                  </div>
                 </div>
+              </div>
             </div>
+
+            {/* Visual Demo */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-accent/20 rounded-3xl blur-3xl transform rotate-3 scale-95" />
+              <div className="relative bg-card border border-border rounded-2xl shadow-2xl p-6 lg:p-10 space-y-6">
+                {/* Input State */}
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-muted-foreground uppercase">You Type</div>
+                  <div className="p-4 rounded-xl bg-background border border-primary/30 text-foreground font-medium shadow-sm">
+                    "I follow a <span className="text-primary bg-primary/10 px-1 rounded">Keto</span> diet but I absolutely cannot have <span className="text-destructive bg-destructive/10 px-1 rounded">Dairy</span> or <span className="text-destructive bg-destructive/10 px-1 rounded">Soy</span>."
+                  </div>
+                </div>
+
+                {/* Arrow */}
+                <div className="flex justify-center text-muted-foreground">
+                  <ArrowDown className="w-6 h-6 animate-bounce" />
+                </div>
+
+                {/* Result State */}
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-muted-foreground uppercase">We Build</div>
+                  <div className="grid gap-3">
+                    <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                      <span className="text-sm font-medium">Dietary Type</span>
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full border border-primary/20">Keto</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                      <span className="text-sm font-medium">Allergens</span>
+                      <div className="flex gap-2">
+                        <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full border border-destructive/20">Dairy</span>
+                        <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full border border-destructive/20">Soy</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       <ForYouSection />
       <FAQSection /> {/* Reusing FAQ Section */}
-      
+
       <Footer />
     </main>
   )

@@ -25,6 +25,7 @@ const DIETARY_PREFERENCES = [
     { name: "Sattvic", description: "Pure vegetarian with no onion, garlic, or stimulants" },
     { name: "Keto", description: "Very low carb, high fat diet to maintain ketosis" },
     { name: "Paleo", description: "Whole foods only; no grains, legumes, or processed foods" },
+    { name: "Auto Immune Protocol", description: "Elimination diet to reduce inflammation (No grains, nightshades, seeds)" },
 ]
 
 const HEALTH_RESTRICTIONS = [
@@ -61,83 +62,103 @@ export function ProfileTab() {
     const [selectedHealth, setSelectedHealth] = useState<string[]>([])
     const [selectedAllergies, setSelectedAllergies] = useState<string[]>([])
     const [customAvoidance, setCustomAvoidance] = useState<Ingredient[]>([])
+    const [novaPreference, setNovaPreference] = useState<string>("no_preference")
 
     const handleAnalyzeBio = async () => {
         setIsAnalyzing(true)
 
-        // Simulate initial parsing delay
-        await new Promise(r => setTimeout(r, 600))
+        try {
+            const { data: { session } } = await supabase.auth.getSession()
+            const token = session?.access_token
 
-        const result = parseDietaryProfile(bioInput)
+            const res = await fetch("/api/profile/analyze-bio", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": token ? `Bearer ${token}` : "",
+                },
+                body: JSON.stringify({ bio: bioInput }),
+            })
 
-        // 1. Reset & Set structured tags
-        // Overwrite previous selections to ensure clean state as requested
-        setSelectedDiets(result.diets)
-        setSelectedHealth(result.health)
-        setSelectedAllergies(result.allergies)
-
-        // 2. Process Custom Terms (Async Ingredient Match)
-        if (result.customTerms.length > 0) {
-            const matchedIngredients: Ingredient[] = []
-
-            for (const term of result.customTerms) {
-                try {
-                    // Fetch from our API
-                    const res = await fetch(`/api/ingredients/search?q=${encodeURIComponent(term)}`)
-                    if (res.ok) {
-                        const data = await res.json()
-                        // If we find a good match (results[0]), add it.
-                        // We only take the first result as the "best guess".
-                        if (data.results && data.results.length > 0) {
-                            const topMatch = data.results[0]
-                            matchedIngredients.push(topMatch)
-                        }
-                    }
-                } catch (err) {
-                    console.error("Error matching ingredient:", term, err)
-                }
+            if (!res.ok) {
+                console.error("Analysis failed:", res.status, res.statusText)
+                // Returning early on failure
+                setIsAnalyzing(false)
+                return
             }
 
-            // Set custom avoidance list
-            setCustomAvoidance(matchedIngredients)
-        } else {
-            // If no custom terms, clear the list (part of the "reset" requirement)
-            setCustomAvoidance([])
-        }
+            const data = await res.json()
 
-        setIsAnalyzing(false)
+            // Update State with AI results
+            setSelectedDiets(data.diets || [])
+            setSelectedHealth(data.health || [])
+            setSelectedAllergies(data.allergies || [])
+            setCustomAvoidance(data.custom_avoidance || [])
+
+        } catch (error) {
+            console.error("Error calling analyze-bio:", error)
+        } finally {
+            setIsAnalyzing(false)
+        }
     }
 
     useEffect(() => {
         let mounted = true
         async function load() {
             setLoading(true)
-            const user = supabase.auth.getUser ? (await supabase.auth.getUser()).data.user : null
-            if (!user) {
-                setError("Not signed in")
-                setLoading(false)
+
+            // 1. Get authenticated user
+            const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+            if (authError || !user) {
+                console.log("ProfileTab: No authenticated user found.")
+                if (mounted) {
+                    setError("Not signed in")
+                    setLoading(false)
+                }
                 return
             }
-            const { data, error } = await supabase.from("profiles").select("*").eq("user_id", user.id).limit(1).single()
+
+            console.log("ProfileTab: Loading profile for user", user.id, user.email)
+
+            // 2. Fetch profile from DB
+            const { data: rows, error } = await supabase
+                .from("profiles")
+                .select("*")
+                .eq("user_id", user.id)
+                .limit(1)
+
+            // Extract single item from array if exists
+            const data = rows && rows.length > 0 ? rows[0] : null
 
             if (mounted) {
-                if (error && error.code !== "PGRST100") {
+                if (error) {
+                    console.error("ProfileTab: Error fetching profile:", error)
                     setError(error.message)
                 } else if (data) {
+                    console.log("ProfileTab: Profile found in DB:", data)
                     setProfile(data)
-                    // Prioritize profile name, fallback to auth metadata, then email
-                    const displayName = data.name || user.user_metadata?.full_name || user.email?.split('@')[0] || "Friend"
-                    setName(displayName)
+
+                    // Prioritize DB name -> Auth Meta name -> Email prefix
+                    const dbName = data.name
+                    const metaName = user.user_metadata?.full_name || user.user_metadata?.name
+                    const emailName = user.email?.split('@')[0]
+
+                    const finalName = dbName || metaName || emailName || "Friend"
+                    setName(finalName)
 
                     const json = data.profile_json || {}
                     setSelectedDiets(Array.isArray(json.dietary_preferences) ? json.dietary_preferences : [])
                     setSelectedHealth(Array.isArray(json.health_restrictions) ? json.health_restrictions : [])
                     setSelectedAllergies(Array.isArray(json.allergies) ? json.allergies : [])
                     setCustomAvoidance(Array.isArray(json.custom_avoidance) ? json.custom_avoidance : [])
+                    setNovaPreference(json.nova_preference || "no_preference")
                 } else {
-                    // New profile case
-                    const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Friend"
-                    setName(displayName)
+                    console.log("ProfileTab: No DB profile found. Using auth defaults.")
+                    // No profile in DB yet, pre-fill from Auth
+                    const metaName = user.user_metadata?.full_name || user.user_metadata?.name
+                    const emailName = user.email?.split('@')[0]
+                    setName(metaName || emailName || "Friend")
                 }
                 setLoading(false)
             }
@@ -169,7 +190,8 @@ export function ProfileTab() {
             dietary_preferences: selectedDiets,
             health_restrictions: selectedHealth,
             allergies: selectedAllergies,
-            custom_avoidance: customAvoidance
+            custom_avoidance: customAvoidance,
+            nova_preference: novaPreference
         }
 
         const payload = {
@@ -216,7 +238,7 @@ export function ProfileTab() {
             <div className="space-y-4 bg-primary/5 p-6 rounded-xl border border-primary/10">
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-primary" />
-                    <h2 className="text-lg font-semibold text-primary">Nutrition Intelligence Builder</h2>
+                    <h2 className="text-lg font-semibold text-primary">Intelligent Profile Builder</h2>
                 </div>
                 <p className="text-sm text-foreground/80">
                     Describe your needs in plain English, and we'll build your profile automatically.
@@ -262,6 +284,44 @@ export function ProfileTab() {
                             </Label>
                         </div>
                     ))}
+                </div>
+            </div>
+
+            <div className="h-px bg-border/50" />
+
+            {/* NOVA Classification */}
+            <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                    <span className="text-xl">🏭</span>
+                    <h2 className="text-lg font-semibold">Processing Tolerance (NOVA)</h2>
+                </div>
+                <p className="text-sm text-muted-foreground">Control how processed your foods can be.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors cursor-pointer ${novaPreference === 'avoid_nova_4' ? 'bg-secondary border-primary/40' : 'border-border/50 hover:bg-secondary/50'}`}
+                        onClick={() => setNovaPreference('avoid_nova_4')}>
+                        <div className="mt-1">
+                            <div className={`w-4 h-4 rounded-full border border-primary flex items-center justify-center ${novaPreference === 'avoid_nova_4' ? 'bg-primary' : ''}`}>
+                                {novaPreference === 'avoid_nova_4' && <div className="w-2 h-2 rounded-full bg-background" />}
+                            </div>
+                        </div>
+                        <div className="flex-1 space-y-1">
+                            <span className="font-medium block">Avoid Ultra-Processed Foods</span>
+                            <span className="text-xs text-muted-foreground block">Strictly avoid NOVA Group 4 (e.g., soft drinks, packaged snacks, mass-produced breads).</span>
+                        </div>
+                    </div>
+
+                    <div className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors cursor-pointer ${novaPreference === 'no_preference' ? 'bg-secondary border-primary/40' : 'border-border/50 hover:bg-secondary/50'}`}
+                        onClick={() => setNovaPreference('no_preference')}>
+                        <div className="mt-1">
+                            <div className={`w-4 h-4 rounded-full border border-primary flex items-center justify-center ${novaPreference === 'no_preference' ? 'bg-primary' : ''}`}>
+                                {novaPreference === 'no_preference' && <div className="w-2 h-2 rounded-full bg-background" />}
+                            </div>
+                        </div>
+                        <div className="flex-1 space-y-1">
+                            <span className="font-medium block">No Specific Preference</span>
+                            <span className="text-xs text-muted-foreground block">Don't filter based on processing level.</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 

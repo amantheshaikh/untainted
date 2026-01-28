@@ -25,7 +25,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.untainted.io"),
   title: {
-    default: "Untainted – Food Intelligence API for Safer, Personalized Decisions",
+    default: "Untainted – Hyper-Personalized Food Intelligence For Modern Food Platforms",
     template: "%s | Untainted"
   },
   description:
@@ -49,8 +49,8 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "https://www.untainted.io",
-    title: "Untainted – Food Intelligence API",
-    description: "Build safer, smarter food experiences with the Untainted API.",
+    title: "Untainted – Hyper-Personalized Food Intelligence For Modern Food Platforms",
+    description: "Build safer, smarter food experiences for your consumers with the Untainted API stack.",
     siteName: "Untainted",
     images: [
       {
@@ -63,8 +63,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Untainted – Food Intelligence API",
-    description: "Build safer, smarter food experiences with the Untainted API.",
+    title: "Untainted – Hyper-Personalized Food Intelligence For Modern Food Platforms",
+    description: "Build safer, smarter food experiences for your consumers with the Untainted API stack.",
     images: ["/opengraph-image.png"],
     creator: "@untainted_io",
   },

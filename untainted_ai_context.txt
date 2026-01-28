@@ -1,0 +1,321 @@
+# Untainted Project Context Bundle
+Generated on Mon Jan 26 01:36:24 IST 2026
+----------------------------------------
+
+## 1. Project Context Summary
+# Project Context for AI Agents
+
+## 📚 Deep-Dive Documentation
+**Agencies & Developers**: Refer to these files for granular details:
+- **[System Map](../docs/SYSTEM_MAP.md)**: Holographic code map. Connects features -> endpoints -> functions -> state. **Read this to find where code lives.**
+- **[Database Schema](../docs/DATABASE_SCHEMA.md)**: Full reference of all tables (profiles, history) and JSON structures.
+
+## Tech Stack
+- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Lucide React (Icons).
+- **Backend**: Python 3.x, FastAPI.
+- **Database**: Supabase (PostgreSQL).
+- **Hosting**: Vercel (Frontend), Fly.io (Backend).
+
+## Project Structure
+```text
+/
+├── landing-page/       # Next.js Frontend
+│   ├── app/            # App Router pages & layouts
+│   ├── components/     # React components (shadcn/ui style)
+│   ├── lib/            # Utilities (Supabase client, utils)
+│   └── public/         # Static assets
+├── backend/            # FastAPI Backend
+│   ├── app.py          # Entry point
+│   ├── server.py       # Core logic (Taxonomy, Normalization)
+│   ├── vlm.py          # Vision Logic (Barcode/OCR)
+│   ├── logging_config.py # Logging setup
+│   ├── ingredients.txt # Taxonomy definitions
+│   └── additives.txt   # E-number database
+├── supabase/           # Database
+│   └── migrations/     # SQL migrations
+├── docs/               # Detailed Documentation
+│   ├── ARCHITECTURE.md # High-level design
+│   ├── SYSTEM_MAP.md   # Feature-to-Code mapping
+│   └── DATABASE_SCHEMA.md # DB Reference
+└── .agent/             # AI-specific context & guidelines
+```
+
+## Key Conventions
+- **Server Actions**: Used for mutations in Next.js.
+- **API Communication**: The frontend communicates with the FastAPI backend via standard HTTP requests (fetch).
+- **Styling**: Tailwind CSS with utility classes. Avoid custom CSS files where possible.
+- **State Management**: React Server Components for data fetching where possible.
+
+## Data Models (High-Level)
+*Consult `docs/DATABASE_SCHEMA.md` for exact fields.*
+
+- **Product**: Represents a food item (Barcode, Name, Brand, Ingredients List).
+- **Ingredient**: Individual component of a product (Name, Safety Rating, Description).
+- **Scan**: User activity record (User ID, Product ID, Timestamp, Result).
+
+----------------------------------------
+## 2. System Hologram (Feature Map)
+# System Map (Codebase Hologram)
+
+This file maps logical features to physical code locations.
+
+## 1. Core Features
+
+### Feature: Product Lookup (Barcode)
+- **Endpoint**: `POST /product/lookup`
+- **Entry Point**: `backend/app.py:product_lookup`
+- **Logic**:
+    1.  Auth Check: `backend/app.py:_authenticate_request`
+    2.  Dataset Query: `backend/server.py:off_dataset_lookup` (Uses Open Food Facts DB)
+    3.  Field Extraction: `backend/server.py:_extract_product_fields`
+- **Frontend Client**: `landing-page/lib/untainted-api.ts:lookupProductByBarcode`
+
+### Feature: Ingredient Analysis (Text/Label)
+- **Endpoint**: `POST /check` or `POST /analyze`
+- **Entry Point**: `backend/app.py:check`
+- **Logic**:
+    1.  Payload Resolution: `backend/app.py:_resolve_payload`
+    2.  Core Analysis: `backend/server.py:process_ingredients`
+        -   Normalizer: `backend/server.py:IngredientNormalizer`
+        -   Taxonomy: `backend/server.py:IngredientTaxonomy` (Loads `backend/ingredients.txt`)
+        -   Safety Check: Checks against `CLEAN_EATING_WATCHLIST` in `server.py`.
+- **Frontend Client**: `landing-page/lib/untainted-api.ts:analyzeIngredients`
+
+### Feature: Vision Extraction (VLM)
+- **Endpoint**: 
+    - `POST /extract/ingredients` (Text only)
+    - `POST /extract/nutrition` (Nutrition facts only)
+    - `POST /extract/label` (Combined)
+- **Entry Point**: 
+    - `backend/app.py:extract_ingredients_endpoint`
+    - `backend/app.py:extract_nutrition_endpoint`
+    - `backend/app.py:extract_label_endpoint`
+- **Logic**:
+    1.  Image Decode: `backend/app.py:_decode_base64_images`
+    2.  Gemini Call: 
+        - `backend/vlm.py:extract_ingredients_with_gemini`
+        - `backend/vlm.py:extract_nutrition_with_gemini`
+        - `backend/vlm.py:extract_label_with_gemini`
+    3.  Prompt: Defined inside `backend/vlm.py`.
+
+## 2. Critical Configuration
+
+### Backend (`backend/.env` / `backend/app.py`)
+-   `OFF_TAXONOMY_PATH`: Path to `ingredients.txt`.
+-   `GEMINI_API_KEY`: Required for VLM features.
+-   `SUPABASE_URL` / `SUPABASE_KEY`: Database connection.
+-   `Rate Limits`: `ANON_RATE_LIMIT_PER_MIN`, `KEY_RATE_LIMIT_PER_MIN` (in `app.py`).
+
+### Frontend (`landing-page/.env.local`)
+-   `NEXT_PUBLIC_API_BASE`: URL of the backend (e.g., `https://api.untainted.io`).
+
+## 3. Data Flow Triggers
+-   **Server Actions**: `landing-page/app/actions.ts` handles form submissions (like "Contact Us").
+-   **Client Fetches**: All app logic (`/scan`, `/result`) uses `landing-page/lib/untainted-api.ts` to talk to the backend.
+
+----------------------------------------
+## 3. Database Schema
+# Database Schema Reference
+
+**Provider**: Supabase (PostgreSQL)
+**Schema**: `public`
+
+## 1. Tables
+
+### `profiles`
+User identity and shared profile data.
+- **id** (uuid, PK): Internal profile ID.
+- **user_id** (uuid, FK -> auth.users): Links to Supabase Auth.
+- **name** (text): Display name.
+- **profile_json** (jsonb): Stores structured preferences.
+    - `dietary_preferences`: list[str] (e.g., "vegan", "keto")
+    - `health_restrictions`: list[str] (e.g., "diabetes")
+    - `allergies`: list[str] (e.g., "peanuts")
+    - `custom_avoidance`: list[str] (raw ingredient names)
+
+### `preferences`
+Stores specific user configuration (redundant/linked to profile).
+- **id** (uuid, PK)
+- **user_id** (uuid, FK)
+- **preferences** (jsonb): Same structure as `profile_json`.
+
+### `history`
+Log of all scans and analyses.
+- **id** (uuid, PK)
+- **user_id** (uuid, FK)
+- **barcode** (text): Scanned content.
+- **product_name** (text): Resolved name.
+- **request_payload** (jsonb): What was sent to `/check`.
+- **analysis_result** (jsonb): The full JSON output from `/check`.
+- **processing_time_ms** (int)
+
+### `api_keys`
+Platform-level access keys (B2B).
+- **id** (uuid, PK)
+- **customer_name** (text)
+- **key_hash** (text): Hashed storage of the key (plain key not stored).
+- **quota_remaining** (int)
+
+## 2. JSON Structures
+
+### Analysis Result (`history.analysis_result`)
+```json
+{
+  "status": "safe|not_safe",
+  "verdict_title": "Clean",
+  "flagged_ingredients": ["Sugar", "E621"],
+  "health_insights": ["High sugar content"],
+  "taxonomy": [
+    {
+      "id": "en:sugar",
+      "display": "Sugar",
+      "synonyms": ["sucrose"]
+    }
+  ]
+}
+```
+
+----------------------------------------
+## 4. Directory Structure
+.
+./untainted_ai_context.txt
+./llms.txt
+./backend
+./backend/server.py
+./backend/logging_config.py
+./backend/pytest.ini
+./backend/test_product_lookup.py
+./backend/requirements.txt
+./backend/Dockerfile
+./backend/test_noodles.json
+./backend/tests
+./backend/tests/conftest.py
+./backend/tests/__init__.py
+./backend/tests/test_api.py
+./backend/__init__.py
+./backend/README.md
+./backend/vlm.py
+./backend/app.py
+./backend/additives.txt
+./backend/fssai.py
+./backend/ingredients.txt
+./backend/test_ingredient_parsing.py
+./docs
+./docs/ARCHITECTURE.md
+./docs/API_REFERENCE.md
+./docs/DATABASE_SCHEMA.md
+./docs/SYSTEM_MAP.md
+./supabase
+./supabase/migrations
+./supabase/migrations/001_create_tables.sql
+./supabase/README.md
+./supabase/functions
+./supabase/functions/preferences
+./supabase/functions/feedback
+./supabase/functions/history
+./README.md
+./package-lock.json
+./scripts
+./scripts/verify_backend.py
+./scripts/create_github_repo.sh
+./scripts/enhance_docs.py
+./scripts/bundle_context.sh
+./scripts/verify_uid_model.py
+./landing-page
+./landing-page/pnpm-lock.yaml
+./landing-page/app
+./landing-page/app/personal
+./landing-page/app/robots.ts
+./landing-page/app/contact
+./landing-page/app/privacy
+./landing-page/app/security
+./landing-page/app/opengraph-image.tsx
+./landing-page/app/signup
+./landing-page/app/terms
+./landing-page/app/business
+./landing-page/app/opengraph-image.png
+./landing-page/app/about
+./landing-page/app/docs
+./landing-page/app/how-it-works
+./landing-page/app/blog
+./landing-page/app/signin
+./landing-page/app/profile
+./landing-page/app/actions.ts
+./landing-page/app/sitemap.ts
+./landing-page/app/layout.tsx
+./landing-page/app/api
+./landing-page/app/page.tsx
+./landing-page/app/pricing
+./landing-page/app/globals.css
+./landing-page/vercel.json
+./landing-page/postcss.config.mjs
+./landing-page/next.config.mjs
+./landing-page/tsconfig.tsbuildinfo
+./landing-page/content
+./landing-page/content/blog
+./landing-page/next-env.d.ts
+./landing-page/debug_output_2.txt
+./landing-page/styles
+./landing-page/styles/globals.css
+./landing-page/debug_output.txt
+./landing-page/components
+./landing-page/components/mdx
+./landing-page/components/theme-provider.tsx
+./landing-page/components/ui
+./landing-page/components/sections
+./landing-page/components/layout
+./landing-page/components/profile
+./landing-page/components/data-display
+./landing-page/components/food
+./landing-page/public
+./landing-page/public/sparkling-water-can-lime.jpg
+./landing-page/public/icon-light-32x32.png
+./landing-page/public/images
+./landing-page/public/placeholder-logo.png
+./landing-page/public/placeholder-user.jpg
+./landing-page/public/placeholder.jpg
+./landing-page/public/favicon.png
+./landing-page/public/strawberry-yogurt-cup.jpg
+./landing-page/public/granola-bar-food-product-barcode.jpg
+./landing-page/public/openapi.yaml
+./landing-page/public/granola-bar-healthy-snack.jpg
+./landing-page/public/favicon.svg
+./landing-page/public/placeholder.svg
+./landing-page/package-lock.json
+./landing-page/package.json
+./landing-page/hooks
+./landing-page/lib
+./landing-page/lib/supabaseClient.ts
+./landing-page/lib/untainted-api.ts
+./landing-page/lib/blog.ts
+./landing-page/lib/utils.ts
+./landing-page/lib/data.tsx
+./landing-page/lib/profile-parser.ts
+./landing-page/components.json
+./landing-page/tsconfig.json
+./fly.toml
+
+----------------------------------------
+## 5. Database Schema (Additives Definitions)
+# For reference:
+#
+# EU list of additives:
+#
+# https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A02008R1333-20230720
+# Annex 2 REGULATION (EC) No 1333/2008 OF THE EUROPEAN PARLIAMENT AND OF THE
+# COUNCIL
+# of 16 December 2008
+# on food additives
+# (Text with EEA relevance)
+#3
+# Codex Alimentarius:
+# http://www.fao.org/gsfaonline/additives/details.html?id=322
+#
+# The ANSES (French Agency for Food, Environmental and Occupational Health & Safety) has listed 140 "additives of interest" in 2019
+# https://www.anses.fr/fr/content/rapport-oqali-bilan-et-%C3%A9volution-de-lutilisation-des-additifs-dans-les-produits-transform%C3%A9s
+# those additives are tagged here after as follows:
+# anses_additives_of_interest:en:yes
+# with "en:yes" being the only possible value
+
+... (truncated)
+

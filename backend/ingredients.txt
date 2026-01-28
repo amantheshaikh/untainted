@@ -2802,6 +2802,9 @@ vegetarian:en: yes
 wikipedia:en: https://en.wikipedia.org/wiki/Milk
 
 < en:milk
+en: milk solids, milk solid
+
+< en:milk
 en: milk enriched with cream
 de: Milch angereichert mit Rahm
 fr: lait enrichi de crème
@@ -52077,8 +52080,8 @@ ciqual_food_name:fr: Oignon, séché
 
 #category/onion-powder
 #processing:en: en:powder
-#<en:onion
-#en:onion powder, Granulated onion, Dried minced onion
+< en:onion
+en: onion powder, Granulated onion, Dried minced onion
 #bg:лук на прах
 #ca:ceba en pols
 #cs:Sušená cibule
@@ -52610,8 +52613,8 @@ it: Impasto d'aglio
 pl: pasta czosnkowa
 # en:garlic-paste has 35 products in 2 languages @2018-10-23
 
-#<en:garlic
-#en:garlic powder
+< en:garlic
+en: garlic powder
 #en:processing:en:powder
 #bs:bijeli luk u prahu
 #ca:All en pols
@@ -54882,6 +54885,7 @@ eurocode_2_group_3:en: 8.40.15
 # zh-tw:茄
 wikidata:en: Q7540
 wikipedia:en: https://en.wikipedia.org/wiki/Eggplant
+synonyms:en: brinjal
 
 #comment:en:This can be seen as compound ingredient, i.e.:melanzane grigliate (melanzane, olio di girasole)
 
@@ -55675,6 +55679,7 @@ nl: okra
 pt: Quiabo
 eurocode_2_group_3:en: 8.45.60
 wikidata:en: Q12047207
+synonyms:en: lady's finger
 
 # description:fr:La SALADE est un terme générique désignant en jardinage et horticulture diverses sortes de feuilles, c'est-à-dire de plantes potagères dont les feuilles, consommées crues, entrent dans la composition d'un mets froid dont elles ont pris le nom, la « salade », sous-entendu « salade verte ».
 # comment:en:in english salad seems to refer more to the group of dishes than the group of plants.
@@ -61466,6 +61471,7 @@ ciqual_food_code:en: 15001
 ciqual_food_name:en: Peanut
 ecobalyse:en: peanut-non-eu
 ecobalyse_labels_en_organic:en: peanut-organic
+synonyms:en: groundnut
 
 < en:peanut
 en: peanut paste
@@ -93290,3 +93296,311 @@ en: vitamin and mineral blend, vitamin and mineral mix
 it: vitamine e minerali misti
 ru: витаминно минеральный премикс, витаминный премикс
 
+
+
+
+
+# Added from Indian Cuisine List (Contextualized)
+
+< en:pulse
+en: split beans
+
+< en:pulse
+en: pigeon pea
+
+< en:pulse
+en: yellow split gram
+
+< en:pulse
+en: horse gram
+
+< en:pulse
+en: moth bean
+
+< en:pulse
+en: balls
+
+< en:pulse
+en: kidney beans
+
+< en:pulse
+en: black lentil
+
+< en:pulse
+en: white lentil
+
+< en:cereal
+en: sorghum bicolor
+
+< en:cereal
+en: pearl millet
+
+< en:cereal
+en: proso millet
+
+< en:cereal
+en: oats
+
+< en:spice
+en: chili pepper-green
+
+< en:spice
+en: chili pepper-red
+
+< en:spice
+en: curry leaf
+
+< en:spice
+en: java pepper
+
+< en:spice
+en: black stone flower
+
+< en:vegetable
+en: chayote
+
+< en:vegetable
+en: silk squash
+
+< en:vegetable
+en: sponge gourd
+
+< en:vegetable
+en: egyptian luffa
+
+< en:vegetable
+en: bitter gourd
+
+< en:vegetable
+en: teasle gourd
+
+< en:vegetable
+en: armenian cucumber
+
+< en:vegetable
+en: bottle gourd
+
+< en:vegetable
+en: calabash
+
+< en:vegetable
+en: ridge gourd
+
+< en:vegetable
+en: chinese okra
+
+< en:vegetable
+en: ridged luffa
+
+< en:vegetable
+en: snake gourd
+
+< en:vegetable
+en: pointed gourd
+
+< en:vegetable
+en: ash gourd
+
+< en:vegetable
+en: apple gourd
+
+< en:vegetable
+en: indian round gourd
+
+< en:vegetable
+en: ivy gourd
+
+< en:vegetable
+en: gentlemen's toes
+
+< en:vegetable
+en: little gourd
+
+< en:vegetable
+en: mango tender leaf shoots
+
+< en:vegetable
+en: colocasia leaves
+
+< en:vegetable
+en: green amaranth
+
+< en:vegetable
+en: drumstick leaves
+
+< en:vegetable
+en: tamarind tender leaf shoots
+
+< en:vegetable
+en: jute leaves
+
+< en:vegetable
+en: green sorrel
+
+< en:vegetable
+en: red amaranth
+
+< en:vegetable
+en: indian roselle
+
+< en:vegetable
+en: kenaf
+
+< en:vegetable
+en: radish leaves
+
+< en:vegetable
+en: malabar spinach
+
+< en:vegetable
+en: phooi leaf
+
+< en:vegetable
+en: red vine spinach
+
+< en:vegetable
+en: creeping spinach
+
+< en:vegetable
+en: climbing spinach
+
+< en:vegetable
+en: mustard leaves
+
+< en:vegetable
+en: sessile joyweed
+
+< en:vegetable
+en: hara pyaz
+
+< en:vegetable
+en: safflower leaves
+
+< en:vegetable
+en: argula
+
+< en:vegetable
+en: catnip
+
+< en:vegetable
+en: drumstick
+
+< en:vegetable
+en: capsicum
+
+< en:root vegetable
+en: colocasia
+
+< en:root vegetable
+en: german turnip
+
+< en:root vegetable
+en: elephant foot yam
+
+< en:root vegetable
+en: jícama
+
+< en:root vegetable
+en: yam bean
+
+< en:nut
+en: indian almond
+
+< en:nut
+en: areca nut
+
+< en:legume
+en: cluster beans
+
+< en:legume
+en: french beans
+
+< en:fruit
+en: madras thorn
+
+< en:fruit
+en: cashew fruit
+
+< en:fruit
+en: tender coconut
+
+< en:fruit
+en: ripe coconut
+
+< en:fruit
+en: jequirity
+
+< en:fruit
+en: cjinese conkerberry
+
+< en:fruit
+en: indian plum
+
+< en:fruit
+en: jujube
+
+< en:fruit
+en: starfruit
+
+< en:fruit
+en: bilimbi
+
+< en:fruit
+en: jambul
+
+< en:fruit
+en: jamun
+
+< en:fruit
+en: malabar plum
+
+< en:fruit
+en: rose apple
+
+< en:fruit
+en: wood apple
+
+< en:fruit
+en: curd fruit
+
+< en:fruit
+en: bael
+
+< en:fruit
+en: mircocos paniculata
+
+< en:fruit
+en: hog plum
+
+< en:fruit
+en: toddy palm
+
+< en:fruit
+en: ice-apple
+
+< en:fruit
+en: mulberry
+
+< en:fruit
+en: purple mangosteen
+
+< en:fruit
+en: indian green
+
+< en:fruit
+en: sweet lime
+
+< en:fruit
+en: sapodilla
+
+< en:fruit
+en: asian pear
+
+< en:fruit
+en: sugar apple
+
+< en:fruit
+en: musk melon
+
+< en:fruit
+en: butter fruit

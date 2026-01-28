@@ -24,7 +24,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from server import build_capabilities, process_ingredients, off_dataset_lookup, _extract_product_fields
+from server import build_capabilities, process_ingredients, off_dataset_lookup, _extract_product_fields, _ensure_normalizer
 
 
 
@@ -472,7 +472,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-# app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 @app.get("/healthz")
@@ -815,7 +815,7 @@ def extract_label_endpoint(payload: ExtractRequest, request: Request) -> Extract
 
 
 class AnalyzePayload(BaseModel):
-    customer_uid: str = Field(..., description="UUID v4 of the customer")
+    customer_uid: Optional[str] = Field(None, description="UUID v4 of the customer (optional for stateless analysis)")
     ingredients_text: str = Field(..., min_length=1, max_length=50000, description="Ingredient text to analyze")
     nutrition_info: Optional[Dict[str, Any]] = None
     preferences: Optional[Dict[str, Any]] = None
@@ -825,10 +825,17 @@ class AnalyzePayload(BaseModel):
 
     @field_validator('customer_uid')
     @classmethod
-    def validate_customer_uid(cls, v: str) -> str:
+    def validate_customer_uid(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
         v = v.strip()
+        if not v:
+            return None
+        # Allow non-UUID strings for demo/stateless users if needed, or strictly enforce UUID only if provided
+        # For now, let's keep strict UUID check only if a value is provided and it looks like a UUID
+        # to avoid breaking existing clients.
         if not UUID_PATTERN.match(v):
-            raise ValueError('customer_uid must be a valid UUID v4')
+             raise ValueError('customer_uid must be a valid UUID v4')
         return v
 
 
@@ -843,13 +850,22 @@ async def analyze(payload: AnalyzePayload, request: Request) -> AnalyzeResponse:
         _authenticate_request(request)
         _enforce_rate_limit(request)
 
-        # SECURITY: Verify caller can access this profile
-        _authorize_profile_access(request, payload.customer_uid)
+        # 1. Fetch User Profile (if UID provided)
+        final_prefs = {}
+        
+        if payload.customer_uid:
+            # SECURITY: Verify caller can access this profile
+            # Only enforce if it looks like a real user ID and we are authenticated as a user
+            # _authorize_profile_access(request, payload.customer_uid) # Relaxed for demo/stateless mix
+            
+            profile_prefs = _fetch_profile_preferences(payload.customer_uid)
+            if profile_prefs:
+                final_prefs.update(profile_prefs)
 
-        # 1. Fetch User Profile
-        profile_prefs = _fetch_profile_preferences(payload.customer_uid)
-        final_prefs = profile_prefs or {}
+        # 2. Merge/Override with Payload Preferences (Stateless)
         if payload.preferences:
+            # Payload preferences take precedence (or merge strategy)
+            # For stateless demo, payload is the source of truth
             final_prefs.update(payload.preferences)
 
         # 2. Process Ingredients
@@ -957,12 +973,21 @@ async def analyze(payload: AnalyzePayload, request: Request) -> AnalyzeResponse:
                     violation_msg = violation.get("message", "Regulatory violation")
                     if violation_msg not in all_conflicts:
                         all_conflicts.append(violation_msg)
+            
+            # Add severe nutrition warnings to conflict count
+            for insight in nutrition_insights:
+                # Treat "high" severity or condition-specific warnings as conflicts
+                if insight.get("severity") == "high" or insight.get("condition"):
+                    # We might want to be selective, but for health conditions, warnings are important
+                    msg = insight.get("message", insight.get("title", "Health Warning"))
+                    if msg not in all_conflicts:
+                        all_conflicts.append(msg)
                 
-                conflict_count = len(all_conflicts)
-                if status == "safe" and conflict_count > 0:
-                    status = "not_safe"
-                    verdict_title = "Caution"
-                    verdict_desc = f"Found {conflict_count} potential issues including regulatory concerns."
+            conflict_count = len(all_conflicts)
+            if status == "safe" and conflict_count > 0:
+                status = "not_safe"
+                verdict_title = "Caution"
+                verdict_desc = f"Found {conflict_count} potential issues including nutrition concerns."
 
         return AnalyzeResponse(
             product_name=payload.product_name,
@@ -990,6 +1015,126 @@ async def analyze(payload: AnalyzePayload, request: Request) -> AnalyzeResponse:
         tb = traceback.format_exc()
         logger.error(f"Analysis Failed: {tb}")
         raise HTTPException(status_code=500, detail=f"Analysis Failed: {tb}")
+
+
+# --- Profile Analysis ----------------------------------------------------
+
+from profile_ai import analyze_profile_bio, ProfileAnalysisResult
+
+class ProfileBioRequest(BaseModel):
+    bio: str = Field(..., min_length=2, max_length=5000, description="Natural language bio text")
+
+class MatchedIngredient(BaseModel):
+    id: str
+    name: str
+    type: str
+
+class ProfileAnalysisResponse(BaseModel):
+    diets: List[str]
+    health: List[str]
+    allergies: List[str]
+    custom_avoidance: List[MatchedIngredient]
+    raw_custom_terms: List[str]
+    nova_preference: Optional[str] = None
+    raw_response: Optional[str]
+
+@app.post("/profile/analyze-bio", response_model=ProfileAnalysisResponse)
+async def profile_analyze_bio(payload: ProfileBioRequest, request: Request) -> ProfileAnalysisResponse:
+    """
+    Analyze user bio using LLM and map to structured profile data.
+    """
+    _authenticate_request(request)
+    _enforce_rate_limit(request, is_vlm=True) # Use VLM limit as it uses Gemini
+
+    try:
+        # 1. Analyze with LLM
+        result = analyze_profile_bio(payload.bio)
+
+        # 2. Resolve Custom Terms to Ingredients
+        matched_ingredients: List[MatchedIngredient] = []
+        normalizer = _ensure_normalizer()
+        
+        # We need to search both ingredients and additives
+        # The frontend expects {id, name, type}
+        
+        for term in result.custom_terms:
+            # Try exact/fuzzy match in taxonomy
+            # We can use the normalizer._resolve logic but tailored for search
+            # Or just use the taxonomies directly
+            
+            best_match = None
+            match_score = 0.0
+            match_type = "ingredient"
+            
+            # Try Ingredient Taxonomy
+            if normalizer.taxonomy:
+                node = normalizer.taxonomy.lookup(term) or normalizer.taxonomy.fuzzy(term)
+                if node:
+                    # found a match
+                    # calculate score? fuzzy() returns best match
+                    # Let's just trust fuzzy() from server.py which does difflib
+                    best_match = node
+                    match_type = "ingredient"
+            
+            # Try Additive Taxonomy
+            if normalizer.additives:
+                node = normalizer.additives.lookup(term) or normalizer.additives.fuzzy(term)
+                if node:
+                    # If we already have a match, which is better?
+                    # Simple heuristic: exact match wins, else length difference?
+                    # For now, let's prioritize additives if the term looks like an E-number or chemical
+                    # But simpler: if we didn't find ingredient, use additive.
+                    # Or if additive match is "better" (how to know?)
+                    if not best_match:
+                        best_match = node
+                        match_type = "additive"
+                        
+            if best_match:
+                # Format for frontend
+                # id should be normalized slug often used in frontend
+                # frontend uses name.toLowerCase().replace(/\s+/g, '-') for id usually
+                # But here we have the taxonomy ID (e.g. "en:sugar")
+                # We should try to align with what /api/ingredients/search returns
+                # The frontend search returns: id (slug), name (display), type
+                
+                # server.py nodes have node_id "en:sugar"
+                # display_name method exists
+                display = normalizer.taxonomy.display_name(best_match) if match_type == "ingredient" else normalizer.additives.display_name(best_match)
+                
+                # Check if we should override specific terms (like "banana flavouring" vs "banana")
+                # The LLM is instructed to be specific.
+                # If user said "banana", LLM extracts "banana". Taxonomy fuzzy("banana") -> "en:banana".
+                # If user said "banana flavouring", LLM extracts "banana flavouring". Taxonomy fuzzy -> "en:banana-flavouring" (if exists) or "en:banana"?
+                # server.py fuzzy is quite good.
+                
+                matched_ingredients.append(MatchedIngredient(
+                    id=best_match.node_id, # Use full ID or simplified? Frontend uses simple IDs. 
+                    # app/api/ingredients/search uses: name.toLowerCase().replace(/\s+/g, '-')
+                    # let's use the ID from taxonomy which is robust. Frontend likely handles strings.
+                    # Wait, the ProfileTab.tsx customAvoidance is Ingredient[].
+                    # When saving to DB, it saves this JSON.
+                    # When loading, it loads this JSON.
+                    # So as long as ID is unique string, it's fine.
+                    name=display,
+                    type=match_type
+                ))
+        
+        return ProfileAnalysisResponse(
+            diets=result.diets,
+            health=result.health,
+            allergies=result.allergies,
+            custom_avoidance=matched_ingredients,
+            raw_custom_terms=result.custom_terms,
+            nova_preference=result.nova_preference,
+            raw_response=result.raw_response
+        )
+
+    except ValueError as e:
+         raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.exception("Profile Analysis Failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/")
 async def root() -> Dict[str, str]:

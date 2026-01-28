@@ -9,14 +9,6 @@ create table if not exists profiles (
   updated_at timestamptz default now()
 );
 
-create table if not exists preferences (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users(id) not null,
-  profile_id uuid references profiles(id),
-  preferences jsonb,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
 
 create table if not exists history (
   id uuid default gen_random_uuid() primary key,
@@ -51,4 +43,4 @@ create table if not exists api_keys (
 
 -- Add indexes
 create index if not exists idx_history_user_id on history(user_id);
-create index if not exists idx_preferences_user_id on preferences(user_id);
+

@@ -20,7 +20,7 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
   const router = useRouter()
 
   async function handlePersonalSignUp(e: React.FormEvent) {
@@ -42,8 +42,8 @@ export default function SignUpPage() {
     }
 
     // Sign up with Supabase
-    const { data: authData, error: authError } = await supabase.auth.signUp({ 
-      email, 
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
       password,
       options: {
         data: {
@@ -54,7 +54,11 @@ export default function SignUpPage() {
     })
 
     if (authError) {
-      setError(authError.message)
+      if (authError.message.includes("User already registered") || authError.message.includes("already registered")) {
+        setError("This email is already in use. Please sign in instead.")
+      } else {
+        setError(authError.message)
+      }
       setLoading(false)
       return
     }
@@ -62,13 +66,13 @@ export default function SignUpPage() {
     // If signup successful, we might want to manually insert/update profile to ensure name is sync'd
     // if using Supabase triggers, this might be automatic. But to be safe for "Personal" aesthetic:
     if (authData.user) {
-        // Double check/ensure profile row exists or update it
-        // We'll trust the trigger or subsequent profile load, but updating here ensures immediate availability
-        await supabase.from("profiles").upsert({
-            user_id: authData.user.id,
-            name: name,
-            phone: phone
-        })
+      // Double check/ensure profile row exists or update it
+      // We'll trust the trigger or subsequent profile load, but updating here ensures immediate availability
+      await supabase.from("profiles").upsert({
+        user_id: authData.user.id,
+        name: name,
+        phone: phone
+      })
     }
 
     setLoading(false)
@@ -81,10 +85,10 @@ export default function SignUpPage() {
 
   return (
     <>
-  <Navbar />
+      <Navbar />
       <div className="min-h-screen pt-32 pb-20 bg-background flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-4xl space-y-8">
-          
+
           <div className="text-center space-y-4">
             <h2 className="text-sm font-semibold text-primary tracking-wider uppercase">Sign up for Untainted</h2>
             <h1 className="text-4xl font-bold tracking-tight text-foreground">
@@ -96,14 +100,14 @@ export default function SignUpPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-6 w-full">
-            
+
             {/* Personal Option */}
             <button
               onClick={() => setAccountType("personal")}
               className={cn(
                 "group relative p-8 rounded-2xl border-2 text-left transition-all duration-200 hover:shadow-lg h-full",
-                accountType === "personal" 
-                  ? "border-primary bg-primary/5 ring-1 ring-primary" 
+                accountType === "personal"
+                  ? "border-primary bg-primary/5 ring-1 ring-primary"
                   : "border-border bg-card hover:border-primary/50"
               )}
             >
@@ -117,7 +121,7 @@ export default function SignUpPage() {
               <p className="text-muted-foreground text-sm leading-relaxed mb-4">
                 Understand whether a food product is safe for your body, not just “generally safe.”
               </p>
-              
+
               <ul className="space-y-2 text-sm text-foreground/80 mb-6">
                 <li>✔ Check products against your diet, allergies, and sensitivities</li>
                 <li>✔ Get clear ingredient-level explanations</li>
@@ -128,7 +132,7 @@ export default function SignUpPage() {
               <p className="text-sm font-medium text-foreground/60 italic">
                 No medical jargon. Just clarity.
               </p>
-              
+
               <div className={cn(
                 "absolute top-6 right-6 h-6 w-6 rounded-full border-2 flex items-center justify-center transition-colors",
                 accountType === "personal" ? "border-primary bg-primary" : "border-muted-foreground/30"
@@ -144,8 +148,8 @@ export default function SignUpPage() {
               }}
               className={cn(
                 "group relative p-8 rounded-2xl border-2 text-left transition-all duration-200 hover:shadow-lg h-full",
-                accountType === "business" 
-                  ? "border-primary bg-primary/5 ring-1 ring-primary" 
+                accountType === "business"
+                  ? "border-primary bg-primary/5 ring-1 ring-primary"
                   : "border-border bg-card hover:border-primary/50"
               )}
             >
@@ -183,31 +187,31 @@ export default function SignUpPage() {
 
           {/* Dynamic Content Area */}
           <div className="max-w-md mx-auto w-full transition-all duration-300 min-h-[100px]">
-            
+
             {/* Case: No Selection */}
             {!accountType && (
-               <div className="text-center text-sm text-muted-foreground py-8">
-                 Select an option above to continue.
-               </div>
+              <div className="text-center text-sm text-muted-foreground py-8">
+                Select an option above to continue.
+              </div>
             )}
 
             {/* Case: Business Selected */}
             {accountType === "business" && (
-               <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-300 pt-8">
-                 <Button 
-                   size="lg" 
-                   onClick={handleBusinessClick}
-                   className="w-full text-lg h-12"
-                 >
-                   Contact Us
-                 </Button>
-               </div>
+              <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-300 pt-8">
+                <Button
+                  size="lg"
+                  onClick={handleBusinessClick}
+                  className="w-full text-lg h-12"
+                >
+                  Contact Us
+                </Button>
+              </div>
             )}
 
             {/* Case: Personal Selected */}
             {accountType === "personal" && (
               <form onSubmit={handlePersonalSignUp} className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300 bg-card p-6 rounded-2xl border border-border shadow-sm">
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
                   <Input

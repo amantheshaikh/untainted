@@ -20,8 +20,7 @@ const sections = [
     title: "Business",
     links: [
       { label: "API Documentation", href: "/docs" },
-      { label: "Pricing", href: "#pricing" },
-      { label: "Case Studies", href: "#cases" },
+      { label: "Pricing", href: "/pricing" },
       { label: "Request Demo", href: "/contact" },
     ],
   },
@@ -29,8 +28,7 @@ const sections = [
     title: "Company",
     links: [
       { label: "About", href: "/about" },
-      { label: "Blog", href: "#blog" },
-      { label: "Careers", href: "#careers" },
+      { label: "Blog", href: "/blog" },
       { label: "Contact Us", href: "/contact" },
     ],
   },
@@ -57,7 +55,7 @@ export const Footer = () => {
         try {
           const el = document.querySelector(href)
           if (el && typeof (el as HTMLElement).scrollIntoView === "function") {
-            ;(el as HTMLElement).scrollIntoView({ behavior: "smooth", block: "start" })
+            ; (el as HTMLElement).scrollIntoView({ behavior: "smooth", block: "start" })
             return true
           }
         } catch (e) {
@@ -132,7 +130,7 @@ export const Footer = () => {
             {/* App Download Buttons */}
             <div className="flex gap-2 mt-4 mb-6">
               <button
-                onClick={() => router.push('/download')}
+                onClick={() => router.push('/personal')}
                 className="inline-flex items-center gap-2 bg-foreground text-background px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
               >
                 <Apple className="w-4 h-4" />
@@ -219,18 +217,6 @@ export const Footer = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-muted-foreground">{currentYear} Untainted. All rights reserved.</p>
             <div className="flex items-center gap-6">
-              <a
-                href="#status"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
-              >
-                System Status
-              </a>
-              <a
-                href="#support"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
-              >
-                Support
-              </a>
             </div>
           </div>
         </motion.div>

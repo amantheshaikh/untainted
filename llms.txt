@@ -1,0 +1,14 @@
+# Untainted Project Documentation for LLMs
+
+The following files provide the most token-efficient context for this project:
+
+- Core Context: .agent/project_context.md (Start here)
+- Architecture: docs/ARCHITECTURE.md
+- Database Schema: supabase/migrations/ (Read latest SQL file)
+- API Definition: backend/app.py (FastAPI routes)
+
+## Quick Orientation
+This is a Next.js + FastAPI project.
+- Frontend logic is in `landing-page/`.
+- Backend logic is in `backend/`.
+- We prioritize robust typing (TypeScript/Pydantic).

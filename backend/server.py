@@ -140,6 +140,42 @@ CLEAN_EATING_FLAG_IDS = {
     "en:lecithins",
 }
 
+# Mapping of parent ingredient to their common derivatives/synonyms
+# When a user wants to avoid a parent ingredient, they likely want to avoid these too
+INGREDIENT_DERIVATIVES: Dict[str, Set[str]] = {
+    "palm oil": {
+        "palmolein", "palm olein", "palm kernel oil", "palm kernel",
+        "palm fat", "palm stearin", "rbd palm oil", "refined palm oil",
+        "hydrogenated palm oil", "fractionated palm oil", "palm shortening",
+        "vegetable palm oil", "sustainable palm oil", "palm superolein",
+        "edible vegetable oil palmolein",
+    },
+    "soy": {
+        "soya", "soybean", "soy sauce", "soy lecithin", "tofu", "tempeh",
+        "edamame", "miso", "soy protein", "soy flour", "soy milk",
+        "hydrolyzed soy protein", 
+    },
+    "corn": {
+        "maize", "corn flour", "corn starch", "cornstarch", "corn syrup",
+        "high fructose corn syrup", "corn oil", "corn meal", "polenta",
+        "dextrose", "maltodextrin",
+    },
+    "wheat": {
+        "maida", "refined wheat flour", "whole wheat", "wheat gluten",
+        "wheat flour", "wheat starch", "semolina", "durum wheat",
+        "wheat germ", "wheat bran", "atta",
+    },
+    "msg": {
+        "monosodium glutamate", "e621", "yeast extract", "hydrolyzed protein",
+        "glutamic acid", "autolyzed yeast",
+    },
+    "dairy": {
+        "milk", "milk solids", "milk powder", "whey", "casein", "lactose",
+        "cream", "butter", "ghee", "cheese", "curd", "paneer", "skimmed milk",
+        "whole milk powder", "buttermilk",
+    },
+}
+
 DEFAULT_STOPWORDS = {
     "en": {
         "and",
@@ -267,12 +303,15 @@ def normalize_additive_code(text: str) -> str:
     Normalize additive codes to E-number format.
     
     Converts INS codes to E-numbers and handles sub-classifications.
+    Also converts decimal classifications (1, 2, 3) to Roman (i, ii, iii).
+    Handles formats without prefixes like "501(i)" or "(508)".
+
     Examples:
         - "INS 500" -> "e500"
         - "INS 500 (ii)" -> "e500(ii)"
-        - "INS 500(ii)" -> "e500(ii)"
-        - "E 500 (ii)" -> "e500(ii)"
-        - "e500 (ii)" -> "e500(ii)"
+        - "INS 500(2)" -> "e500(ii)"
+        - "501(1)" -> "e501(i)"
+        - "(508)" -> "(e508)"
     
     Args:
         text: Input text that may contain additive codes
@@ -280,20 +319,69 @@ def normalize_additive_code(text: str) -> str:
     Returns:
         Normalized text with E-number format
     """
-    # Pattern to match INS/E codes with optional spaces and sub-classifications
-    # Matches: INS 500, INS 500(ii), INS 500 (ii), E500, E 500, E500(ii), E 500 (ii), etc.
-    pattern = r'\b(?:INS|E)\s*(\d+)\s*(\([ivx]+\))?'
-    
-    def replace_code(match):
-        number = match.group(1)
-        subclass = match.group(2) if match.group(2) else ""
-        # Remove spaces from sub-classification if present
-        subclass = subclass.replace(" ", "")
+    roman_map = {
+        "1": "i", "2": "ii", "3": "iii", "4": "iv", "5": "v",
+        "6": "vi", "7": "vii", "8": "viii", "9": "ix", "10": "x"
+    }
+
+    def _replace_match(match, number_group=1, subclass_group=2):
+        number = match.group(number_group)
+        subclass = match.group(subclass_group) if subclass_group and match.lastindex and match.lastindex >= subclass_group else ""
+        if not subclass:
+             # Handle optional groups that might not be captured
+             try:
+                 subclass = match.group(subclass_group) if match.group(subclass_group) else ""
+             except IndexError:
+                 subclass = ""
+
+        if subclass:
+            # Extract content from parentheses
+            inner = subclass.strip("()")
+            # Remove spaces
+            inner = inner.replace(" ", "")
+            
+            # Convert decimal to roman if needed
+            if inner.isdigit() and inner in roman_map:
+                inner = roman_map[inner]
+            
+            subclass = f"({inner})"
+
         return f"e{number}{subclass}"
+
+    # 1. Standard INS/E prefixes (highest confidence)
+    # Matches: INS 500, E 500, INS 500(ii)
+    text = re.sub(
+        r'\b(?:INS|E)\s*(\d+)\s*(\([ivx0-9]+\))?', 
+        lambda m: _replace_match(m, 1, 2), 
+        text, 
+        flags=re.IGNORECASE
+    )
+
+    # 2. Code + Suffix (Implicit prefix)
+    # Matches: 501(i), 501(1), 451 (i)
+    # Must have 3-4 digits to be safe
+    text = re.sub(
+        r'\b(\d{3,4})\s*(\([ivx0-9]+\))', 
+        lambda m: _replace_match(m, 1, 2), 
+        text, 
+        flags=re.IGNORECASE
+    )
+
+    # 3. Parenthesized Code (Implicit prefix)
+    # Matches: (508), ( 500 )
+    # Replaces content inside parens but keeps parens: (e508)
+    def _replace_parens(match):
+        number = match.group(1)
+        return f"(e{number})"
+
+    text = re.sub(
+        r'\(\s*(\d{3,4})\s*\)', 
+        _replace_parens, 
+        text, 
+        flags=re.IGNORECASE
+    )
     
-    # Apply the replacement
-    result = re.sub(pattern, replace_code, text, flags=re.IGNORECASE)
-    return result
+    return text
 
 
 def normalize_token(text: str) -> str:
@@ -621,8 +709,12 @@ class IngredientTaxonomy:
         length = len(normalized)
         initial_cutoff = 0.9 if length <= 4 else 0.82 if length <= 8 else 0.75
         match = best_match(initial_cutoff)
+        
+        # Fallback to more lenient matching if length is sufficient, 
+        # but avoid being too aggressive for medium-long words
         if match is None and length >= 5:
-            match = best_match(max(initial_cutoff - 0.1, 0.65))
+            lenient_cutoff = max(initial_cutoff - 0.05, 0.75) if length > 8 else max(initial_cutoff - 0.1, 0.65)
+            match = best_match(lenient_cutoff)
 
         if match is None and " " in normalized:
             condensed = normalized.replace(" ", "")
@@ -1201,16 +1293,20 @@ DIET_FALLBACK_TOKENS: Dict[str, Set[str]] = {
     },
     "vegan": {
         "butter",
+        "buttermilk",
         "casein",
         "cheese",
         "cream",
+        "dairy",
         "egg",
         "gelatin",
         "ghee",
         "honey",
         "lactose",
         "milk",
+        "milk solids",
         "whey",
+        "yogurt",
     },
     "jain": {
         "garlic",
@@ -1315,6 +1411,55 @@ DIET_FALLBACK_TOKENS: Dict[str, Set[str]] = {
         "cauliflower",
         "mushroom",
         "bean",
+    },
+    "aip": {
+        "grain",
+        "wheat",
+        "oats",
+        "rice",
+        "corn",
+        "barley",
+        "rye",
+        "legume",
+        "bean",
+        "soy",
+        "peanut",
+        "lentil",
+        "chickpea",
+        "nightshade",
+        "tomato",
+        "potato",
+        "eggplant",
+        "pepper",
+        "chili",
+        "capsicum",
+        "paprika",
+        "dairy",
+        "milk",
+        "cheese",
+        "butter",
+        "ghee",
+        "egg",
+        "nut",
+        "almond",
+        "cashew",
+        "walnut",
+        "seed",
+        "sunflower seed",
+        "sesame",
+        "sugar",
+        "alcohol",
+        "additive",
+        "gum",
+        "thickener",
+        "emulsifier",
+        "artificial sweetener",
+        "stevia",
+        "vegetable oil",
+        "canola oil",
+        "soybean oil",
+        "sunflower oil",
+        "corn oil",
     },
     }
 
@@ -1584,6 +1729,18 @@ def _build_diet_rules() -> Dict[str, Dict[str, Set[str]]]:
             "en:cauliflower",
             "en:mushroom",
         ],
+        "aip": [
+            "en:grains",
+            "en:legumes",
+            "en:nightshade-plants",
+            "en:dairy",
+            "en:egg",
+            "en:nuts",
+            "en:seeds",
+            "en:food-additives",
+            "en:alcohol",
+            "en:sugar",
+        ],
     }
 
     rules: Dict[str, Dict[str, Set[str]]] = {}
@@ -1724,6 +1881,12 @@ def process_ingredients(
                     cleaned = normalize_token(part)
                     if cleaned:
                         custom_avoidance_tokens.add(cleaned)
+                        # Also add any known derivatives of this ingredient
+                        for parent, derivatives in INGREDIENT_DERIVATIVES.items():
+                            parent_norm = normalize_token(parent)
+                            if cleaned == parent_norm or parent_norm in cleaned:
+                                custom_avoidance_tokens.update(derivatives)
+
 
     # accept nutriments passed via product_meta (OpenFoodFacts product dict)
     if isinstance(product_meta, dict):
@@ -1738,7 +1901,8 @@ def process_ingredients(
 
     is_safe, hits, diet_hits, allergy_hits, health_insights = evaluate_items(
         items, list(active_diets), allergy_tokens, custom_avoidance=custom_avoidance_tokens,
-        nutriments=nutriments, health_conditions=health_conditions
+        nutriments=nutriments, health_conditions=health_conditions, product_meta=product_meta,
+        preferences=preferences
     )
 
     display = [item.display for item in items]
@@ -1812,6 +1976,8 @@ def evaluate_items(
     custom_avoidance: Optional[Set[str]] = None,
     nutriments: Optional[Dict[str, Any]] = None,
     health_conditions: Optional[List[str]] = None,
+    product_meta: Optional[Dict[str, Any]] = None,
+    preferences: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, List[str], List[str], List[str], List[str]]:
     hits: Set[str] = set()
     diet_hits: List[str] = []
@@ -2041,7 +2207,56 @@ def evaluate_items(
                             seen_insights.add(insight.lower())
                             health_insights.append(insight)
 
+    # NOVA Group Checks (Ultra-processed foods)
+    nova_group = None
+    if isinstance(product_meta, dict):
+        nova_group = product_meta.get("nova_group") or product_meta.get("nova_groups")
+        if nova_group:
+             try:
+                 nova_group = int(nova_group)
+             except (ValueError, TypeError):
+                 nova_group = None
+
+    # Check preferences for NOVA avoidance
+    avoid_nova_4 = False
+    if preferences and isinstance(preferences, dict):
+        # Check explicit NOVA preference
+        nova_pref = preferences.get("nova_preference")
+        if nova_pref == "avoid_nova_4":
+            avoid_nova_4 = True
+        
+        # Check backward compatibility with health_restrictions "Clean Eating" 
+        # (Though Clean Eating is usually ingredient based, some users conflate it with NOVA 4)
+        health_list = preferences.get("health_restrictions") or []
+        for h in health_list:
+            if "nova" in str(h).lower() and "4" in str(h):
+                avoid_nova_4 = True
+            if "ultra-processed" in str(h).lower():
+                avoid_nova_4 = True
+
+    if nova_group is not None:
+        # Add NOVA insight for everyone
+        nova_descriptions = {
+            1: "NOVA 1: Minimally processed foods",
+            2: "NOVA 2: Processed culinary ingredients",
+            3: "NOVA 3: Processed foods",
+            4: "NOVA 4: Ultra-processed food & drink products"
+        }
+        insight = nova_descriptions.get(nova_group, f"NOVA Group: {nova_group}")
+        if insight not in seen_insights:
+            seen_insights.add(insight)
+            health_insights.append(insight)
+        
+        # Flag if Avoiding NOVA 4
+        if avoid_nova_4 and nova_group == 4:
+            hit = "Ultra-Processed (NOVA 4)"
+            if hit.lower() not in seen_diet:
+                 seen_diet.add(hit.lower())
+                 diet_hits.append(hit)
+
+
     # Verdict Logic
+
     # Safe if NO Allergy hits AND NO Diet hits AND (NO Strict Hits)
     is_safe = (len(hits) == 0) and (len(diet_hits) == 0) and (len(allergy_hits) == 0)
     

@@ -26626,3 +26626,11 @@ lt: kildinimo medžiaga amonio karbonatas
 nl: ammonium- en natriumcarbonaten, ammonium carbonaten en natrium
 # ingredient/fr:carbonates-d’ammonium-et-de-sodium has 110 products in 7 languages @2019-04-06
 
+
+# Common Additive Classes added for exact matching
+en:thickener, thickeners
+en:emulsifier, emulsifiers
+en:stabiliser, stabilisers, stabilizer, stabilizers
+en:humectant, humectants
+en:acidity-regulator, acidity regulators, acidity regulator
+en:flavour-enhancer, flavor enhancer, flavor enhancers, flavour enhancer, flavour enhancers

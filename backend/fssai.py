@@ -342,14 +342,19 @@ MANDATORY_ALLERGEN_DECLARATIONS: Set[str] = {
 
 # Health conditions and their FSSAI-relevant nutrient thresholds
 HEALTH_CONDITION_THRESHOLDS: Dict[str, Dict[str, NutrientLimit]] = {
+    "diabetic_friendly": {
+        "sugar": NutrientLimit(max_per_100g=5.0, daily_limit=25.0, unit="g"),
+        "carbohydrates": NutrientLimit(max_per_100g=15.0, daily_limit=130.0, unit="g"),
+        "glycemic_index": NutrientLimit(max_per_serving=55),
+    },
     "diabetes": {
         "sugar": NutrientLimit(max_per_100g=5.0, daily_limit=25.0, unit="g"),
         "carbohydrates": NutrientLimit(max_per_100g=15.0, daily_limit=130.0, unit="g"),
-        "glycemic_index": NutrientLimit(max_per_serving=55),  # Low GI threshold
+        "glycemic_index": NutrientLimit(max_per_serving=55),
     },
     "hypertension": {
         "sodium": NutrientLimit(max_per_100g=400.0, daily_limit=2000.0, unit="mg"),
-        "potassium": NutrientLimit(max_per_100g=None, daily_limit=4700.0, unit="mg"),  # Higher is better
+        "potassium": NutrientLimit(max_per_100g=None, daily_limit=4700.0, unit="mg"),
     },
     "heart_disease": {
         "saturated_fat": NutrientLimit(max_per_100g=1.5, daily_limit=20.0, unit="g"),
@@ -357,16 +362,47 @@ HEALTH_CONDITION_THRESHOLDS: Dict[str, Dict[str, NutrientLimit]] = {
         "cholesterol": NutrientLimit(max_per_100g=20.0, daily_limit=300.0, unit="mg"),
         "sodium": NutrientLimit(max_per_100g=400.0, daily_limit=2000.0, unit="mg"),
     },
+    "high_cholesterol": {
+        "saturated_fat": NutrientLimit(max_per_100g=1.5, daily_limit=20.0, unit="g"),
+        "trans_fat": NutrientLimit(max_per_100g=0.1, daily_limit=0.0, unit="g"), # Stricter on trans fat
+        "cholesterol": NutrientLimit(max_per_100g=20.0, daily_limit=200.0, unit="mg"), # Stricter
+    },
+    "heart_healthy": {
+         "saturated_fat": NutrientLimit(max_per_100g=1.5, daily_limit=20.0, unit="g"),
+         "trans_fat": NutrientLimit(max_per_100g=0.0, daily_limit=0.0, unit="g"),
+         "sodium": NutrientLimit(max_per_100g=400.0, daily_limit=2000.0, unit="mg"),
+    },
     "kidney_disease": {
         "sodium": NutrientLimit(max_per_100g=200.0, daily_limit=1500.0, unit="mg"),
         "potassium": NutrientLimit(max_per_100g=200.0, daily_limit=2000.0, unit="mg"),
         "phosphorus": NutrientLimit(max_per_100g=100.0, daily_limit=800.0, unit="mg"),
         "protein": NutrientLimit(max_per_100g=10.0, daily_limit=50.0, unit="g"),
     },
+    "kidney_friendly": {
+        "sodium": NutrientLimit(max_per_100g=200.0, daily_limit=1500.0, unit="mg"),
+        "potassium": NutrientLimit(max_per_100g=200.0, daily_limit=2000.0, unit="mg"),
+        "phosphorus": NutrientLimit(max_per_100g=100.0, daily_limit=800.0, unit="mg"),
+    },
     "obesity": {
         "energy": NutrientLimit(max_per_100g=100.0, daily_limit=1800.0, unit="kcal"),
         "sugar": NutrientLimit(max_per_100g=5.0, daily_limit=25.0, unit="g"),
         "saturated_fat": NutrientLimit(max_per_100g=1.5, daily_limit=20.0, unit="g"),
+    },
+    "weight_loss": {
+        "energy": NutrientLimit(max_per_100g=100.0, daily_limit=1500.0, unit="kcal"), # Aggressive
+        "sugar": NutrientLimit(max_per_100g=2.0, daily_limit=20.0, unit="g"),
+        "saturated_fat": NutrientLimit(max_per_100g=1.0, daily_limit=15.0, unit="g"),
+    },
+    "high_protein": {
+        # Actually a goal to HAVE more, not less. 
+        # Current logic checks max limits.
+        # But generate_nutrition_insights has logic for "min" checks? 
+        # No, generate_nutrition_insights currently only iterates HEALTH_CONDITION_THRESHOLDS which are primarily LIMITS.
+        # However, it does check "protein" > 10.0 for general positive insight.
+        # I can add a special check for high_protein in generate_nutrition_insights if needed, 
+        # or abuse the limit logic (min_limit?). 
+        # The current NutrientLimit class only has max/daily. 
+        # Let's Skip High Protein for now in thresholds, rely on general "Good Protein" insight.
     },
 }
 

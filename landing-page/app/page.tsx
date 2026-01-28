@@ -8,8 +8,8 @@ const BuiltForPlatforms = dynamic(() => import("@/components/sections/BuiltForPl
 const BusinessBenefits = dynamic(() => import("@/components/sections/BusinessBenefits").then(mod => mod.BusinessBenefits))
 const BusinessUseCases = dynamic(() => import("@/components/sections/BusinessUseCases").then(mod => mod.BusinessUseCases))
 const IntelligenceEngine = dynamic(() => import("@/components/sections/IntelligenceEngine").then(mod => mod.IntelligenceEngine))
-const DemoSection = dynamic(() => import("@/components/sections/DemoSection").then(mod => mod.DemoSection))
-const PricingSection = dynamic(() => import("@/components/sections/PricingSection").then(mod => mod.PricingSection))
+const EndingCTASection = dynamic(() => import("@/components/sections/EndingCTASection").then(mod => mod.EndingCTASection))
+
 const FAQSection = dynamic(() => import("@/components/sections/FAQSection").then(mod => mod.FAQSection))
 const FeaturesSection = dynamic(() => import("@/components/sections/FeaturesSection").then(mod => mod.FeaturesSection))
 const ForYouSection = dynamic(() => import("@/components/sections/ForYouSection").then(mod => mod.ForYouSection))
@@ -18,9 +18,9 @@ import { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Untainted - Providing Personalized Food Intelligence to Platforms"
+    absolute: "Untainted - Providing Hyper-Personalized Food Intelligence to Platforms"
   },
-  description: "Analyze ingredients, detect allergens, and personalize food choices at scale. The API-first platform for modern food commerce."
+  description: "Analyze ingredients, detect allergens, and personalize food choices at the point of purchase. The API-first platform for modern food commerce."
 }
 
 export default function Page() {
@@ -34,8 +34,7 @@ export default function Page() {
       <IntelligenceEngine />
       <FeaturesSection />
       <ForYouSection />
-      <DemoSection />
-      {/* <PricingSection /> removed as per request */}
+      <EndingCTASection />
       <FAQSection />
       <Footer />
     </>

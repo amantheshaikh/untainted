@@ -4,6 +4,7 @@ export type ParsedProfile = {
   health: string[]
   allergies: string[]
   customTerms: string[]
+  novaPreference?: string
 }
 
 export function parseDietaryProfile(text: string): ParsedProfile {
@@ -13,6 +14,7 @@ export function parseDietaryProfile(text: string): ParsedProfile {
     health: [],
     allergies: [],
     customTerms: [],
+    novaPreference: "no_preference",
   }
 
   // --- Dietary Preferences ---
@@ -21,11 +23,12 @@ export function parseDietaryProfile(text: string): ParsedProfile {
   } else if (t.includes("vegetarian") || t.includes("meat free") || t.includes("no meat")) {
     result.diets.push("Vegetarian")
   }
-  
+
   if (t.includes("jain")) result.diets.push("Jain")
   if (t.includes("keto") || t.includes("ketogenic")) result.diets.push("Keto")
   if (t.includes("paleo")) result.diets.push("Paleo")
   if (t.includes("sattvic")) result.diets.push("Sattvic")
+  if (t.includes("aip") || t.includes("auto immune") || t.includes("autoimmune")) result.diets.push("Auto Immune Protocol")
 
   // --- Allergies ---
   if (t.includes("gluten") || t.includes("celiac") || t.includes("wheat")) result.allergies.push("Gluten")
@@ -45,6 +48,11 @@ export function parseDietaryProfile(text: string): ParsedProfile {
   // Note: Jain implies No Onion-Garlic, but we'll let the user verify specific checks or handle it in UI logic if needed.
   // For now, explicit "Jain" sets Jain diet.
 
+  // --- NOVA / Clean Eating ---
+  if (t.includes("clean eating") || t.includes("ultra processed") || t.includes("processed food") || t.includes("nova 4") || t.includes("junk food")) {
+    result.novaPreference = "avoid_nova_4"
+  }
+
   // --- Custom Extraction ---
   // Simple heuristic to catch "avoid [x]", "allergic to [x]", "no [x]"
   // This is a naive implementation; a real NLP model would be better.
@@ -63,11 +71,11 @@ export function parseDietaryProfile(text: string): ParsedProfile {
   customPatterns.forEach(pattern => {
     let match
     while ((match = pattern.exec(t)) !== null) {
-        const term = match[1].trim()
-        // Filter out short words and known keywords that we already handled with checkboxes
-        if (term.length > 2 && !knownKeywords.has(term) && !term.includes("added sugar")) {
-            customTerms.push(term)
-        }
+      const term = match[1].trim()
+      // Filter out short words and known keywords that we already handled with checkboxes
+      if (term.length > 2 && !knownKeywords.has(term) && !term.includes("added sugar")) {
+        customTerms.push(term)
+      }
     }
   })
 

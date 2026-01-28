@@ -25,10 +25,10 @@ export const HeroSection = () => {
 
             {/* H1 - Rendered immediately for LCP */}
             <h1 className="text-4xl lg:text-5xl xl:text-6xl font-medium leading-tight tracking-tight text-foreground mb-6 text-balance">
-              Personalized Food Intelligence. <span className="text-primary">Built Into Your Platform.</span>
+              Hyper-Personalized Food Intelligence. <span className="text-primary">Built Into Your Platform.</span>
             </h1>
 
-            <motion.p 
+            <motion.p
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
@@ -37,11 +37,11 @@ export const HeroSection = () => {
               The food intelligence layer for India's leading platforms. We help quick-commerce, grocery, food delivery and health apps deliver personalized, safer food decisions to millions of users.
             </motion.p>
 
-            <motion.div 
-               initial={{ opacity: 0, y: 10 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ duration: 0.5, delay: 0.2 }}
-               className="flex flex-wrap gap-4"
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="flex flex-wrap gap-4"
             >
               <Link
                 href="/docs"
@@ -53,7 +53,7 @@ export const HeroSection = () => {
               </Link>
             </motion.div>
 
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.3 }}
@@ -138,11 +138,11 @@ export const HeroSection = () => {
                       <div className="flex gap-3">
                         <div className="w-16 h-16 bg-secondary rounded-lg flex items-center justify-center">
                           <Image
-                             src="/strawberry-yogurt-cup.jpg"
-                             alt="Strawberry Yogurt"
-                             width={64}
-                             height={64}
-                             className="w-full h-full object-cover rounded-lg"
+                            src="/strawberry-yogurt-cup.jpg"
+                            alt="Strawberry Yogurt"
+                            width={64}
+                            height={64}
+                            className="w-full h-full object-cover rounded-lg"
                           />
                         </div>
                         <div className="flex-1">

@@ -1,5 +1,8 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabaseClient"
 import { ProfileNavbar } from "@/components/layout/ProfileNavbar"
 import { Footer } from "@/components/layout/Footer"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -8,6 +11,29 @@ import { FoodAnalyzer } from "@/components/food/FoodAnalyzer"
 import { User, Search } from "lucide-react"
 
 export default function ProfilePage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push("/signin")
+      } else {
+        setLoading(false)
+      }
+    }
+    checkUser()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
   return (
     <>
       <ProfileNavbar />

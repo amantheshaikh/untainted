@@ -33,7 +33,7 @@ function SignInContent() {
   }
 
   // Whitelist of safe redirect paths (must start with /)
-  const SAFE_REDIRECT_PATHS = ["/profile", "/checkout", "/settings", "/dashboard", "/"]
+  const SAFE_REDIRECT_PATHS = ["/profile", "/"]
 
   function getSafeRedirectPath(requestedPath: string | null): string {
     if (!requestedPath) return "/profile"
