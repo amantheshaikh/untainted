@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import difflib
-import json
 import os
 import re
-import urllib.parse
-import urllib.request
 import requests
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -26,6 +23,9 @@ except ImportError:
     OFF_DATASET_AVAILABLE = False
 
 # Removed: argparse, base64, html, io, mimetypes, traceback, urllib.error, http.server, HTTPServer, PIL, cv2, pytesseract
+PYTESSERACT_AVAILABLE = False
+OPENCV_AVAILABLE = False
+PIL_AVAILABLE = False
 
 
 CLEAN_EATING_WATCHLIST = {
@@ -367,7 +367,24 @@ def normalize_additive_code(text: str) -> str:
         flags=re.IGNORECASE
     )
 
-    # 3. Parenthesized Code (Implicit prefix)
+
+    # 3. Code + Letter suffix (e.g. 472e, 150a)
+    # Must explicitly exclude common units (g, mg, kg, ml, l)
+    def _replace_suffix(match):
+        code = match.group(1)
+        suffix = match.group(2)
+        if suffix.lower() in ('g', 'l', 'm', 'k', 's'): # g, ml, kg, mg, s (seconds?) - keep it safe
+             return match.group(0)
+        return f"e{code}{suffix}"
+
+    text = re.sub(
+        r'\b(\d{3,4})([a-z])\b', 
+        _replace_suffix, 
+        text, 
+        flags=re.IGNORECASE
+    )
+
+    # 4. Parenthesized Code (Implicit prefix)
     # Matches: (508), ( 500 )
     # Replaces content inside parens but keeps parens: (e508)
     def _replace_parens(match):
@@ -727,6 +744,29 @@ class IngredientTaxonomy:
 
         if match is None:
             return None
+            
+        # Refinement: Check if match is driven by a generic suffix (e.g. "Cumin powder" matching "Milk powder")
+        # If both token and match end with the same generic word, check similarity of the prefix.
+        WEAK_SUFFIXES = (" powder", " oil", " extract", " flavor", " flavour", " juice", " syrup", " acid", " starch", " flour", " salt", " sugar", "ose", "ate", "ite")
+        
+        normalized_lower = normalized.lower()
+        match_lower = match.lower()
+        
+        for suffix in WEAK_SUFFIXES:
+            if normalized_lower.endswith(suffix) and match_lower.endswith(suffix):
+                # Calculate ratio of the *prefixes*
+                prefix_token = normalized_lower[:-len(suffix)].strip()
+                prefix_match = match_lower[:-len(suffix)].strip()
+                
+                # If prefixes are too different, reject the match
+                # Use a fairly high threshold for prefixes as they carry the main identity
+                prefix_ratio = difflib.SequenceMatcher(None, prefix_token, prefix_match).ratio()
+                if prefix_ratio < 0.8: # Strict threshold for prefix
+                     # Special case: allow if one is substring of other (e.g. "garlic" vs "garlic powder" handled by logic?)
+                     # No, this logic runs when BOTH have the suffix.
+                     return None
+                break
+
         return self.lookup(match)
 
     def display_name(self, node: IngredientNode) -> str:
@@ -811,7 +851,11 @@ class IngredientNormalizer:
     def _tokenize(self, text: str) -> List[str]:
         if not text:
             return []
-        cleaned = text.replace("\r", "\n").replace("•", ",")
+        cleaned = text.replace("\r", "\n").replace("•", ",").replace("&", ",")
+        # Replace period followed by space (end of sentence/item) with comma, but protect decimal numbers
+        # 17.5% should stay 17.5%. "gluten. Allergen" should become "gluten, Allergen"
+        cleaned = re.sub(r'(?<!\d)\.\s+', ', ', cleaned) 
+        
         segments = re.split(r"[\n;]+", cleaned)
         tokens: List[str] = []
         for segment in segments:
@@ -846,7 +890,10 @@ class IngredientNormalizer:
             for i, enumber in enumerate(enumbers):
                 segment = segment.replace(f"__ENUMBER_{i}__", enumber)
             
-            segment = re.sub(r"\[[^]]*\]", " ", segment)
+            # Flatten square brackets similar to parentheses
+            segment = segment.replace("[", ", ").replace("]", "")
+            
+            # segment = re.sub(r"\[[^]]*\]", " ", segment)
             segment = re.sub(r"\s+", " ", segment).strip()
             if not segment:
                 continue
@@ -884,26 +931,85 @@ class IngredientNormalizer:
         if self.additives is not None:
             sources.append((self.additives, "additives"))
 
-        # Prefer exact matches first (ingredients wins ties to preserve existing behaviour)
+        # Common suffixes that imply the ingredient is just a form of the base
+        COMMON_SUFFIXES = (" powder", " oil", " extract", " flavor", " flavour", " juice", " syrup", " acid", " starch", " flour", " salt", " sugar", " seed", " paste", " puree")
+
+        # Prefer exact matches first
         for source, tag in sources:
             if source is None:
                 continue
             node = source.lookup(token)
             if node is not None:
+                # If we found an exact match, check if it's a "rich" node (has parents).
+                # If it's an isolated node (no parents) AND has a common suffix (e.g. "Garlic Powder"),
+                # we might be better off resolving to the base ("Garlic") which usually has the diet flags.
+                if not node.parents:
+                    is_suffix_derivative = False
+                    for suffix in COMMON_SUFFIXES:
+                        if token.endswith(suffix):
+                            base = token[:-len(suffix)].strip()
+                            base_node = source.lookup(base)
+                            if base_node:
+                                # Found the base! Prefer "Garlic" over "Garlic Powder" to catch diet flags
+                                node = base_node
+                                is_suffix_derivative = True
+                                break
+                    
+                    if is_suffix_derivative:
+                         # Use the base node's info
+                         canonical = normalize_token(node.node_id.split(":", 1)[-1])
+                         display = source.display_name(node)
+                         info = source.describe(node)
+                         info["source"] = tag
+                         # Use 'synonym' or 'derived' confidence
+                         return canonical, display, info, 0.95, "derived_base"
+
                 canonical = normalize_token(node.node_id.split(":", 1)[-1])
                 display = source.display_name(node)
                 info = source.describe(node)
                 info["source"] = tag
 
-                # Determine if this was an exact ID match or synonym match
                 node_token = normalize_token(node.node_id.split(":", 1)[-1])
                 if token == node_token:
                     return canonical, display, info, 1.0, "exact"
                 else:
-                    # Matched via synonym
                     return canonical, display, info, 0.95, "synonym"
 
-        # Fallback to fuzzy with additives first (chemical names) then ingredients
+        # Special fallback for E-numbers with subclasses (e.g. e1101(ii) -> e1101)
+        if token.startswith('e') and '(' in token:
+            base_code = token.split('(')[0] # e.g. e1101
+            for source, tag in sources:
+                if source is None: continue
+                node = source.lookup(base_code)
+                if node:
+                    canonical = normalize_token(node.node_id.split(":", 1)[-1])
+                    display = source.display_name(node)
+                    info = source.describe(node)
+                    info["source"] = tag
+                    # Preserve the original full code in display if possible? 
+                    # Actually better to show the resolved group name "Protease" than "Protease (ii)" if unknown
+                    return canonical, display, info, 0.95, "derived_subclass"
+
+        # Fallback: Fuzzy matching
+        # (Suffix stripping logic below is now redundant for exact matches but useful for unmatched tokens)
+        for suffix in COMMON_SUFFIXES:
+            if token.endswith(suffix):
+                base_token = token[:-len(suffix)].strip()
+                if not base_token:
+                    continue
+                
+                for source, tag in sources:
+                    if source is None:
+                        continue
+                    node = source.lookup(base_token)
+                    if node:
+                        canonical = normalize_token(node.node_id.split(":", 1)[-1])
+                        display = source.display_name(node)
+                        info = source.describe(node)
+                        info["source"] = tag
+                        return canonical, display, info, 0.95, "derived"
+
+        # Fallback 2: Fuzzy matching with additives first (chemical names) then ingredients
         for source, tag in sorted(sources, key=lambda pair: 0 if pair[1] == "additives" else 1):
             if source is None:
                 continue
@@ -2106,7 +2212,7 @@ def evaluate_items(
         sodium = _get_nutriment(["sodium_100g", "sodium", "sodium_mg", "salt"])
         saturated_fat = _get_nutriment(["saturated_fat_100g", "saturated_fat", "saturated_fat_g"])
         trans_fat = _get_nutriment(["trans_fat_100g", "trans_fat", "trans_fat_g"])
-        calories = _get_nutriment(["energy_100g", "energy", "calories", "energy_kcal", "kcal"])
+        _get_nutriment(["energy_100g", "energy", "calories", "energy_kcal", "kcal"])
         protein = _get_nutriment(["protein_100g", "protein", "proteins"])
 
         net_carbs = None
