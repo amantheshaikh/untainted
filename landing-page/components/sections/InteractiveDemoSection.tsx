@@ -23,6 +23,11 @@ import { detectConflicts, ApiVerdict } from "../../lib/client-analysis"
 
 export const InteractiveDemoSection = () => {
     // Demo State
+    // VERIFICATION TAG: 2026-01-28_MaggiFix
+    useEffect(() => {
+        console.log("Untainted Demo Loaded: v2026-01-28_MaggiFix")
+    }, [])
+
     const [bioInput, setBioInput] = useState("")
     const [hasCleared, setHasCleared] = useState(false)
     const [isAnalyzing, setIsAnalyzing] = useState(false)

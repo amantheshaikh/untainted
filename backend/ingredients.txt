@@ -31626,6 +31626,7 @@ it: glucosio in polvere
 
 < en:monosaccharide
 en: fructose
+en: levulose
 xx: fructose
 af: fruktose
 ar: فركتوز
