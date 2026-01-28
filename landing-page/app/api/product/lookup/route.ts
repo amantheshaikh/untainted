@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
 // Use environment variable with fallback for local development only
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL;
+const DEFAULT_API_BASE = process.env.NODE_ENV === 'production' ? "https://api.untainted.io" : "http://127.0.0.1:8080";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || DEFAULT_API_BASE;
 
 if (!API_BASE_URL) {
     console.error("CRITICAL: API_BASE_URL not configured. Set NEXT_PUBLIC_API_BASE_URL in environment.");

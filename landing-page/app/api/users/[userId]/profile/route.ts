@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 
 // Use environment variable with fallback for local development only
 // Use environment variable with fallback for local development only
+const DEFAULT_API_BASE = process.env.NODE_ENV === 'production' ? "https://api.untainted.io" : "http://127.0.0.1:8080";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.includes('8000')
     ? "http://127.0.0.1:8080"
-    : (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8080");
+    : (process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE);
 
 export async function PUT(
     request: Request,

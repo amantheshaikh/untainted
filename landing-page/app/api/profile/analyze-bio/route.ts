@@ -1,7 +1,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8080';
+const DEFAULT_BACKEND_URL = process.env.NODE_ENV === 'production' ? 'https://api.untainted.io' : 'http://127.0.0.1:8080';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || DEFAULT_BACKEND_URL;
 
 export async function POST(request: NextRequest) {
     try {

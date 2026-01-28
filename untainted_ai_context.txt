@@ -1,5 +1,5 @@
 # Untainted Project Context Bundle
-Generated on Mon Jan 26 01:36:24 IST 2026
+Generated on Wed Jan 28 10:56:01 IST 2026
 ----------------------------------------
 
 ## 1. Project Context Summary
@@ -133,11 +133,6 @@ User identity and shared profile data.
     - `allergies`: list[str] (e.g., "peanuts")
     - `custom_avoidance`: list[str] (raw ingredient names)
 
-### `preferences`
-Stores specific user configuration (redundant/linked to profile).
-- **id** (uuid, PK)
-- **user_id** (uuid, FK)
-- **preferences** (jsonb): Same structure as `profile_json`.
 
 ### `history`
 Log of all scans and analyses.
@@ -186,11 +181,15 @@ Platform-level access keys (B2B).
 ./backend/pytest.ini
 ./backend/test_product_lookup.py
 ./backend/requirements.txt
+./backend/profile_ai.py
+./backend/ingredients.tmp
 ./backend/Dockerfile
 ./backend/test_noodles.json
 ./backend/tests
 ./backend/tests/conftest.py
 ./backend/tests/__init__.py
+./backend/tests/list_models.py
+./backend/tests/test_profile_ai_manual.py
 ./backend/tests/test_api.py
 ./backend/__init__.py
 ./backend/README.md
@@ -200,6 +199,7 @@ Platform-level access keys (B2B).
 ./backend/fssai.py
 ./backend/ingredients.txt
 ./backend/test_ingredient_parsing.py
+./test_thickener.py
 ./docs
 ./docs/ARCHITECTURE.md
 ./docs/API_REFERENCE.md
@@ -217,6 +217,7 @@ Platform-level access keys (B2B).
 ./package-lock.json
 ./scripts
 ./scripts/verify_backend.py
+./scripts/test_e2e.sh
 ./scripts/create_github_repo.sh
 ./scripts/enhance_docs.py
 ./scripts/bundle_context.sh
@@ -251,6 +252,7 @@ Platform-level access keys (B2B).
 ./landing-page/postcss.config.mjs
 ./landing-page/next.config.mjs
 ./landing-page/tsconfig.tsbuildinfo
+./landing-page/reconstruct_demo.py
 ./landing-page/content
 ./landing-page/content/blog
 ./landing-page/next-env.d.ts
@@ -286,11 +288,13 @@ Platform-level access keys (B2B).
 ./landing-page/hooks
 ./landing-page/lib
 ./landing-page/lib/supabaseClient.ts
+./landing-page/lib/demo-data.ts
 ./landing-page/lib/untainted-api.ts
 ./landing-page/lib/blog.ts
 ./landing-page/lib/utils.ts
 ./landing-page/lib/data.tsx
 ./landing-page/lib/profile-parser.ts
+./landing-page/lib/client-analysis.ts
 ./landing-page/components.json
 ./landing-page/tsconfig.json
 ./fly.toml
