@@ -1,8 +1,8 @@
 "use server";
 
-import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+
+import { Resend } from "resend";
 
 export async function sendContactEmail(formData: {
   name: string;
@@ -11,6 +11,17 @@ export async function sendContactEmail(formData: {
   message: string;
   subject?: string;
 }) {
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    console.warn("Missing RESEND_API_KEY. Email sending is disabled.");
+    return {
+      success: false,
+      error: { message: "Email service is not configured (missing API key)." }
+    };
+  }
+
+  const resend = new Resend(apiKey);
   const { name, email, company, message, subject } = formData;
 
   try {

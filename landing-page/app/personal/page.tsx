@@ -3,7 +3,6 @@
 import { Navbar } from "@/components/layout/Navbar"
 import { Footer } from "@/components/layout/Footer"
 import { ForYouSection } from "@/components/sections/ForYouSection"
-import { EndingCTASection } from "@/components/sections/EndingCTASection"
 import { FAQSection } from "@/components/sections/FAQSection"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -412,8 +411,6 @@ export default function PersonalPage() {
           </div>
         </div>
       </section>
-
-      <EndingCTASection />
 
       {/* Feature Spotlight: Natural Language Intelligence */}
       <section className="py-24 bg-primary/5 border-y border-primary/10">
