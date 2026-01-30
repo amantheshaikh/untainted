@@ -76,7 +76,7 @@ export const metadata: Metadata = {
     apple: "/apple-icon.png",
   },
   alternates: {
-    canonical: "./",
+    canonical: "https://www.untainted.io",
   },
 }
 

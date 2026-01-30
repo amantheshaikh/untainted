@@ -9,7 +9,6 @@ const BusinessBenefits = dynamic(() => import("@/components/sections/BusinessBen
 const BusinessUseCases = dynamic(() => import("@/components/sections/BusinessUseCases").then(mod => mod.BusinessUseCases))
 const IntelligenceEngine = dynamic(() => import("@/components/sections/IntelligenceEngine").then(mod => mod.IntelligenceEngine))
 const EndingCTASection = dynamic(() => import("@/components/sections/EndingCTASection").then(mod => mod.EndingCTASection))
-
 const FAQSection = dynamic(() => import("@/components/sections/FAQSection").then(mod => mod.FAQSection))
 const FeaturesSection = dynamic(() => import("@/components/sections/FeaturesSection").then(mod => mod.FeaturesSection))
 const ForYouSection = dynamic(() => import("@/components/sections/ForYouSection").then(mod => mod.ForYouSection))
@@ -18,9 +17,9 @@ import { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Untainted - Providing Hyper-Personalized Food Intelligence to Platforms"
+    absolute: "Untainted: Hyper-Personalized Food Intelligence for Platforms"
   },
-  description: "Analyze ingredients, detect allergens, and personalize food choices at the point of purchase. The API-first platform for modern food commerce."
+  description: "Analyze ingredients, detect allergens, and provide personalized food choices for your consumers. The API-first platform for modern food commerce."
 }
 
 export default function Page() {
